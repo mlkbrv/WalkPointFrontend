@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6A11CB" />
+      <stop offset="100%" stop-color="#B721FF" />
+    </linearGradient>
+
+    <linearGradient id="ticket-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7F00FF" />
+      <stop offset="100%" stop-color="#E100FF" />
+    </linearGradient>
+
+    <filter id="drop-shadow" x="-20%" y="-20%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg-grad)" />
+
+  <path d="M256 80 C 176 80 128 140 128 208 C 128 296 256 416 256 416 C 256 416 384 296 384 208 C 384 140 336 80 256 80 Z"
+        fill="#FFFFFF"
+        filter="url(#drop-shadow)" />
+
+  <ellipse cx="216" cy="190" rx="16" ry="32" transform="rotate(-15 216 190)" fill="#4A148C" />
+  <ellipse cx="224" cy="246" rx="12" ry="18" transform="rotate(-15 224 246)" fill="#4A148C" />
+
+  <ellipse cx="296" cy="150" rx="16" ry="32" transform="rotate(15 296 150)" fill="#4A148C" />
+  <ellipse cx="288" cy="206" rx="12" ry="18" transform="rotate(15 288 206)" fill="#4A148C" />
+
+  <g transform="translate(180, 280) rotate(-12)" filter="url(#drop-shadow)">
+    <path d="M 16 0 L 184 0 C 192.8 0 200 7.2 200 16 L 200 26 C 188.9 26 180 35 180 46 C 180 57 188.9 66 200 66 L 200 76 C 200 84.8 192.8 92 184 92 L 16 92 C 7.2 92 0 84.8 0 76 L 0 66 C 11.1 66 20 57 20 46 C 20 35 11.1 26 0 26 L 0 16 C 0 7.2 7.2 0 16 0 Z"
+          fill="url(#ticket-grad)" />
+
+    <line x1="36" y1="12" x2="36" y2="80"
+          stroke="#FFFFFF"
+          stroke-width="6"
+          stroke-dasharray="10,6"
+          stroke-linecap="round"
+          opacity="1"/>
+
+    <line x1="164" y1="12" x2="164" y2="80"
+          stroke="#FFFFFF"
+          stroke-width="6"
+          stroke-dasharray="10,6"
+          stroke-linecap="round"
+          opacity="1"/>
+
+    <text x="100" y="62"
+          font-family="system-ui, -apple-system, sans-serif"
+          font-weight="900"
+          font-size="42"
+          fill="#FFFFFF"
+          text-anchor="middle"
+          letter-spacing="1">
+      WP
+    </text>
+  </g>
+</svg>
