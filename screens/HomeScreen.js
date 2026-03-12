@@ -26,12 +26,15 @@ function HomeScreen() {
     walletBalance,
     refreshWallet,
     startStepTracking,
+    syncStepsFromSystem,
+    stepDataUnavailable,
   } = useApp();
 
   useFocusEffect(
     useCallback(() => {
       startStepTracking();
-    }, [startStepTracking])
+      syncStepsFromSystem();
+    }, [startStepTracking, syncStepsFromSystem])
   );
 
   const [goal] = useState(16000);
