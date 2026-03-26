@@ -29,6 +29,7 @@ export default function LoginScreen({ navigation }) {
     try {
       await login(email.trim().toLowerCase(), password);
     } catch (e) {
+      console.error('Login failed', e);
       setError(e.message || 'Login failed');
     } finally {
       setLoading(false);

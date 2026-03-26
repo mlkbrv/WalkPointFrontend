@@ -6,8 +6,9 @@ try {
   NavigationBar = require('expo-navigation-bar');
 } catch (_) {}
 import { BarChart3, Home, MapPin, ShoppingBag, Trophy, User } from 'lucide-react-native';
-import React, { lazy, Suspense, useEffect } from 'react';
-import { ActivityIndicator, AppRegistry, Platform, StyleSheet, View } from 'react-native';
+import React, { Component, lazy, Suspense, useEffect } from 'react';
+import { useApp } from './context/AppContext';
+import { ActivityIndicator, AppRegistry, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';
 
@@ -17,6 +18,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 enableScreens(true);
 
 import AccountScreen from './screens/AccountScreen';
+import HowToConnectStepsScreen from './screens/HowToConnectStepsScreen';
 import CouponDetailScreen from './screens/CouponDetailScreen';
 import CouponRedeemScreen from './screens/CouponRedeemScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -66,11 +68,26 @@ function AuthNavigator() {
   );
 }
 
+function AccountStackNav() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, detachInactiveScreens: true }}>
+      <Stack.Screen name="AccountMain" component={AccountScreen} />
+      <Stack.Screen name="HowToConnectSteps" component={HowToConnectStepsScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function MainTabs() {
   const insets = useSafeAreaInsets();
+  const { startStepTracking } = useApp();
   const tabBarHeight = 70;
   const tabBarPaddingBottom = Math.max(insets.bottom, 8);
   const tabBarTotalHeight = tabBarHeight + insets.bottom;
+
+  // Single place to start step counting when user enters the app (Home and Track no longer start it separately).
+  useEffect(() => {
+    startStepTracking();
+  }, [startStepTracking]);
 
   return (
     <Suspense fallback={<View style={styles.loadingContainer}><ActivityIndicator size="large" color="#8140F3" /></View>}>
@@ -166,7 +183,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Account"
-        component={AccountScreen}
+        component={AccountStackNav}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
@@ -201,6 +218,31 @@ function RootNavigator() {
   );
 }
 
+class AppErrorBoundary extends Component {
+  state = { hasError: false, error: null };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('AppErrorBoundary:', error, info?.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={[styles.loadingContainer, { padding: 24 }]}>
+          <Text style={{ fontSize: 16, color: '#333', textAlign: 'center' }}>
+            Произошла ошибка. Перезапустите приложение.
+          </Text>
+          <Text style={{ fontSize: 12, color: '#666', marginTop: 12 }} selectable>
+            {this.state.error?.message || String(this.state.error)}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   useEffect(() => {
     if (Platform.OS === 'android' && NavigationBar.setPositionAsync) {
@@ -210,13 +252,15 @@ function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <AppErrorBoundary>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <RootNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </AppErrorBoundary>
   );
 }
 

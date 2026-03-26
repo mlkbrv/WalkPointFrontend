@@ -1,27 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as BackgroundFetch from 'expo-background-fetch';
+import * as Notifications from 'expo-notifications';
 import { Pedometer } from 'expo-sensors';
 import * as TaskManager from 'expo-task-manager';
-import * as Notifications from 'expo-notifications';
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Platform, PermissionsAndroid } from 'react-native';
+import React, { createContext, lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, Linking, PermissionsAndroid, Platform, View } from 'react-native';
+import { useHealthData } from '../hooks/useHealthData';
+import {
+  convertSteps as apiConvertSteps,
+  getWallet,
+} from '../services/apiService';
+import { getGoogleFitTodaySteps } from '../services/googleFitSteps';
 import {
   calculateCaloriesMET,
   calculateDistanceFromSteps,
   getDateKey
 } from '../utils/calculations';
-import {
-  convertSteps as apiConvertSteps,
-  getWallet,
-} from '../services/apiService';
-import {
-  isHealthConnectAvailable,
-  initializeHealthConnect,
-  requestHealthConnectPermissions,
-  getTodaySteps as getHealthConnectSteps,
-  checkHealthConnectStatus,
-  openHealthConnectSettings,
-} from '../services/healthConnectService';
+// Lazy to avoid require cycle: AppContext -> HealthConnectRequiredScreen -> useApp (AppContext)
+const HealthConnectRequiredScreen = lazy(() => import('../screens/HealthConnectRequiredScreen'));
+const StepsOnboardingScreen = lazy(() => import('../screens/StepsOnboardingScreen'));
 
 // Import background actions for foreground service (works on Android for background step counting)
 let BackgroundService = null;
@@ -35,9 +32,57 @@ const BACKGROUND_FETCH_INTERVAL_SEC = 15 * 60; // 15 minutes
 const FOREGROUND_SYNC_INTERVAL_MS = 30 * 1000; // 30 seconds when app is active
 const BACKGROUND_SERVICE_SYNC_INTERVAL_MS = 60 * 1000; // 60 seconds in background service
 
-const AppContext = createContext();
+const defaultDailyStatsShape = () => ({
+  steps: 0,
+  time: 0,
+  calories: 0,
+  distance: 0,
+  date: getDateKey(),
+});
 
-export const useApp = () => useContext(AppContext);
+const DEFAULT_APP_VALUE = {
+  stepCount: 0,
+  isTracking: false,
+  dailyStats: defaultDailyStatsShape(),
+  weeklyProgress: [],
+  trackingHistory: [],
+  totalStats: { steps: 0, time: 0, calories: 0, distance: 0 },
+  currentRoute: [],
+  isTrackingRoute: false,
+  startStepTracking: () => {},
+  stopStepTracking: () => {},
+  resetDailyStats: () => {},
+  addTrackingSession: () => {},
+  updateWeeklyProgress: () => {},
+  setCurrentRoute: () => {},
+  setIsTrackingRoute: () => {},
+  getHistoricalStats: async () => null,
+  requestActivityPermission: async () => false,
+  activityPermissionGranted: false,
+  healthConnectReady: false,
+  useHealthConnect: false,
+  initHealthConnect: async () => false,
+  requestHealthConnectPermission: async () => false,
+  openHealthConnectSettings: () => {},
+  openSamsungHealth: async () => {},
+  needsHealthConnectScreen: false,
+  healthConnectAvailable: null,
+  refreshHealthConnectStatus: () => {},
+  healthConnectPlayUrl: null,
+  syncStepsFromSystem: async () => {},
+  isBackgroundServiceRunning: false,
+  startBackgroundService: async () => {},
+  stopBackgroundService: async () => {},
+  walletBalance: '0.00',
+  isSyncing: false,
+  convertStepsToCoins: async () => null,
+  refreshWallet: async () => {},
+  fetchBackendData: async () => {},
+};
+
+const AppContext = createContext(DEFAULT_APP_VALUE);
+
+export const useApp = () => useContext(AppContext) ?? DEFAULT_APP_VALUE;
 
 const BACKGROUND_STEP_TASK = 'background-step-tracking';
 
@@ -76,8 +121,9 @@ TaskManager.defineTask(BACKGROUND_STEP_TASK, async ({ data, error }) => {
       date: dateKey,
     };
 
+    // On Android, Pedometer.getStepCountAsync(date range) is not supported; steps come from Health Connect when app is in foreground
     const isAvailable = await Pedometer.isAvailableAsync();
-    if (isAvailable) {
+    if (isAvailable && Platform.OS !== 'android') {
       try {
         const today = new Date();
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -139,13 +185,14 @@ export const AppProvider = ({ children }) => {
   const [stepCount, setStepCount] = useState(0);
   const [isTracking, setIsTracking] = useState(false);
   const [subscription, setSubscription] = useState(null);
-  const [dailyStats, setDailyStats] = useState({
+  const defaultDailyStats = {
     steps: 0,
     time: 0,
     calories: 0,
     distance: 0,
     date: getDateKey(),
-  });
+  };
+  const [dailyStats, setDailyStats] = useState(defaultDailyStats);
   const [weeklyProgress, setWeeklyProgress] = useState([]);
   const [trackingHistory, setTrackingHistory] = useState([]);
   const [totalStats, setTotalStats] = useState({
@@ -164,15 +211,16 @@ export const AppProvider = ({ children }) => {
   const syncIntervalRef = useRef(null);
   const dateCheckIntervalRef = useRef(null);
   const lastDateRef = useRef(getDateKey());
+  const stepsAtSubscriptionStartRef = useRef(0);
+  const dailyStatsRef = useRef(defaultDailyStats);
   const [activityPermissionGranted, setActivityPermissionGranted] = useState(false);
   const permissionRequestedRef = useRef(false);
   const [isBackgroundServiceRunning, setIsBackgroundServiceRunning] = useState(false);
   const backgroundServiceRef = useRef(false);
-  
-  // Health Connect state
-  const [healthConnectReady, setHealthConnectReady] = useState(false);
-  const [useHealthConnect, setUseHealthConnect] = useState(false);
-  const healthConnectInitializedRef = useRef(false);
+
+  const healthData = useHealthData();
+
+  dailyStatsRef.current = dailyStats ?? defaultDailyStats;
 
   // ── Wallet / backend state ──
   const [walletBalance, setWalletBalance] = useState('0.00');
@@ -191,64 +239,6 @@ export const AppProvider = ({ children }) => {
       return false;
     }
   }, []);
-
-  // Initialize Health Connect (Android only, preferred method for step counting)
-  const initHealthConnect = useCallback(async () => {
-    if (healthConnectInitializedRef.current) return healthConnectReady;
-    if (Platform.OS !== 'android') return false;
-    
-    healthConnectInitializedRef.current = true;
-    console.log('Initializing Health Connect...');
-
-    try {
-      // Check if Health Connect is available
-      const status = await checkHealthConnectStatus();
-      console.log('Health Connect status:', status);
-      
-      if (!status.available) {
-        console.log('Health Connect not available, will use fallback Pedometer');
-        Alert.alert(
-          'Health Connect недоступен',
-          'Для стабильного подсчёта шагов рекомендуется установить Health Connect из Google Play.',
-          [
-            { text: 'Позже', style: 'cancel' },
-            { text: 'Установить', onPress: () => Linking.openURL('https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata') },
-          ]
-        );
-        return false;
-      }
-
-      // Initialize
-      const initialized = await initializeHealthConnect();
-      if (!initialized) {
-        console.log('Failed to initialize Health Connect');
-        return false;
-      }
-
-      // Request permissions
-      const hasPermission = await requestHealthConnectPermissions();
-      if (!hasPermission) {
-        console.log('Health Connect permissions not granted');
-        Alert.alert(
-          'Разрешения не предоставлены',
-          'Для подсчёта шагов необходимо разрешить доступ к данным о шагах в Health Connect.',
-          [
-            { text: 'Отмена', style: 'cancel' },
-            { text: 'Настройки', onPress: () => openHealthConnectSettings() },
-          ]
-        );
-        return false;
-      }
-
-      console.log('Health Connect ready!');
-      setHealthConnectReady(true);
-      setUseHealthConnect(true);
-      return true;
-    } catch (err) {
-      console.error('Error initializing Health Connect:', err);
-      return false;
-    }
-  }, [healthConnectReady]);
 
   // Request Activity Recognition permission (required for step counting on Android 10+)
   const requestActivityPermission = useCallback(async () => {
@@ -322,6 +312,9 @@ export const AppProvider = ({ children }) => {
     await new Promise(async (resolve) => {
       const syncStepsInBackground = async () => {
         try {
+          // Android: Pedometer.getStepCountAsync(date range) not supported; steps sync via Health Connect when app is in foreground
+          if (Platform.OS === 'android') return;
+
           const isAvailable = await Pedometer.isAvailableAsync();
           if (!isAvailable) return;
 
@@ -359,6 +352,7 @@ export const AppProvider = ({ children }) => {
             console.log(`Background sync: ${systemStepsToday} steps`);
           }
         } catch (err) {
+          if (Platform.OS === 'android' && err?.message?.includes('not supported on Android')) return;
           console.error('Background step sync error:', err);
         }
       };
@@ -418,38 +412,51 @@ export const AppProvider = ({ children }) => {
 
       let systemStepsToday = 0;
 
-      // Try Health Connect first (Android, most reliable)
-      if (Platform.OS === 'android' && useHealthConnect && healthConnectReady) {
-        console.log('Syncing steps from Health Connect...');
-        systemStepsToday = await getHealthConnectSteps();
-        console.log('Health Connect steps today:', systemStepsToday);
-      } 
-      // Fallback to iOS Pedometer
+      if (Platform.OS === 'android') {
+        if (healthData.healthConnectAvailable === null) return;
+        try {
+          if (healthData.healthConnectAvailable === true && healthData.isReady) {
+            const hcSteps = await healthData.getTodaySteps();
+            if (hcSteps > 0) console.log('Health Connect steps today:', hcSteps);
+            const gfSteps = await getGoogleFitTodaySteps();
+            if (gfSteps > 0) console.log('Google Fit steps today:', gfSteps);
+            systemStepsToday = Math.max(hcSteps || 0, gfSteps || 0);
+          } else {
+            systemStepsToday = await getGoogleFitTodaySteps();
+            if (systemStepsToday > 0) console.log('Google Fit steps today:', systemStepsToday);
+          }
+        } catch (err) {
+          console.warn('Step count not supported on Android:', err?.message ?? err);
+          systemStepsToday = 0;
+        }
+      }
+      // iOS: HealthKit when ready, else Pedometer fallback
       else if (Platform.OS === 'ios') {
-        const isAvailable = await Pedometer.isAvailableAsync();
-        if (isAvailable) {
-          const today = new Date();
-          const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          const now = new Date();
+        if (healthData.isReady) {
           try {
-            const stepResult = await Pedometer.getStepCountAsync(startOfDay, now);
-            systemStepsToday = stepResult?.steps ?? 0;
-            console.log('iOS Pedometer steps today:', systemStepsToday);
+            systemStepsToday = await healthData.getTodaySteps();
+            console.log('iOS HealthKit steps today:', systemStepsToday);
           } catch (err) {
-            console.log('iOS getStepCountAsync failed:', err.message);
+            console.warn('HealthKit step count failed:', err?.message ?? err);
+          }
+        } else {
+          const pedometerAvailable = await Pedometer.isAvailableAsync();
+          if (pedometerAvailable) {
+            const today = new Date();
+            const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const now = new Date();
+            try {
+              const stepResult = await Pedometer.getStepCountAsync(startOfDay, now);
+              systemStepsToday = stepResult?.steps ?? 0;
+              console.log('iOS Pedometer steps today:', systemStepsToday);
+            } catch (err) {
+              console.log('iOS getStepCountAsync failed:', err.message);
+            }
           }
         }
       }
-      // Android without Health Connect - skip (rely on watchStepCount)
-      else if (Platform.OS === 'android') {
-        console.log('Android without Health Connect: using watchStepCount only');
-        return;
-      }
 
-      if (systemStepsToday <= 0) {
-        console.log('No steps from system');
-        return;
-      }
+      if (systemStepsToday <= 0) return;
 
       const prevSteps = currentStats.steps || 0;
       
@@ -491,44 +498,59 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('syncStepsFromSystem error:', err);
     }
-  }, [useHealthConnect, healthConnectReady]);
+  }, [
+    healthData.isReady,
+    healthData.getTodaySteps,
+    healthData.healthConnectAvailable,
+  ]);
 
-  // Request permission and initialize on mount
+  // On mount: do NOT call healthData.init() here — it triggers requestPermissions() which crashes
+  // (HealthConnectPermissionDelegate.requestPermission not yet set by MainActivity). Permission
+  // is requested only when user taps "Подключить шаги"; restore of existing permission is done in useHealthData.
   useEffect(() => {
     const initialize = async () => {
-      // First try Health Connect (Android) - best source for steps
-      if (Platform.OS === 'android') {
-        const hcReady = await initHealthConnect();
-        console.log('Health Connect initialization result:', hcReady);
+      try {
+        await requestActivityPermission();
+        loadData();
+        initializeBackgroundFetch();
+        fetchBackendData();
+      } catch (err) {
+        console.error('AppContext initialize error:', err);
       }
-      
-      await requestActivityPermission();
-      loadData();
-      initializeBackgroundFetch();
-      fetchBackendData();
     };
     initialize();
-  }, [requestActivityPermission, initHealthConnect]);
+  }, [requestActivityPermission]);
 
-  // Load today's stats, then sync from system so steps taken while app was closed are applied.
+  // Load today's stats, then sync from system (catch so unhandled rejection doesn't crash the app)
   useEffect(() => {
     const initSteps = async () => {
-      const hasPermission = await requestActivityPermission();
-      if (hasPermission) {
-        await loadTodayStats();
-        // Small delay to ensure Health Connect is ready
-        setTimeout(() => syncStepsFromSystem(), 500);
+      try {
+        const hasPermission = await requestActivityPermission();
+        if (hasPermission) {
+          await loadTodayStats();
+          setTimeout(() => syncStepsFromSystem(), 500);
+        }
+      } catch (err) {
+        console.error('AppContext initSteps error:', err);
       }
     };
     initSteps();
   }, [syncStepsFromSystem, requestActivityPermission]);
 
-  // When app comes to foreground, sync steps from system immediately.
+  // When app comes to foreground, sync steps immediately and once more after delay (Samsung Health → Health Connect may need a moment).
   useEffect(() => {
+    let delayTimer = null;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') syncStepsFromSystem();
+      if (state === 'active') {
+        syncStepsFromSystem();
+        if (delayTimer) clearTimeout(delayTimer);
+        delayTimer = setTimeout(syncStepsFromSystem, 2000);
+      }
     });
-    return () => sub?.remove();
+    return () => {
+      if (delayTimer) clearTimeout(delayTimer);
+      sub?.remove();
+    };
   }, [syncStepsFromSystem]);
 
   useEffect(() => {
@@ -581,10 +603,11 @@ export const AppProvider = ({ children }) => {
   };
 
   const convertStepsToCoins = async () => {
-    if (dailyStats.steps < 1) return null;
+    const stats = dailyStats ?? defaultDailyStats;
+    if (!stats || stats.steps < 1) return null;
     setIsSyncing(true);
     try {
-      const result = await apiConvertSteps(dailyStats.steps);
+      const result = await apiConvertSteps(stats.steps);
       setWalletBalance(result.new_balance);
       return result;
     } finally {
@@ -740,39 +763,45 @@ export const AppProvider = ({ children }) => {
       startBackgroundService();
     }
 
-    // IMPORTANT: Use watchStepCount for LIVE step counting (works on Android!)
-    // This counts steps from the moment tracking starts
-    const sub = Pedometer.watchStepCount((result) => {
-      console.log('Live step update:', result.steps);
-      
+    // On Android with Health Connect: Pedometer conflicts with syncStepsFromSystem (overwrites 1354 with ~10).
+    // Skip Pedometer, rely only on syncStepsFromSystem interval.
+    const usePedometer = Platform.OS !== 'android' || !healthData.isReady;
+
+    stepsAtSubscriptionStartRef.current = dailyStatsRef.current?.steps ?? 0;
+
+    const sub = usePedometer ? Pedometer.watchStepCount((result) => {
+      const baseSteps = stepsAtSubscriptionStartRef.current;
+      const newSteps = baseSteps + (result?.steps ?? 0);
+      if (newSteps > 0) console.log('Live step update:', newSteps);
+
       setDailyStats((prev) => {
-        const newSteps = prev.steps + result.steps;
-        const newDistance = calculateDistanceFromSteps(newSteps);
-        const timeHours = (prev.time || 0) / 60;
+        const safePrev = prev ?? defaultDailyStats;
+        const steps = baseSteps + (result?.steps ?? 0);
+        const newDistance = calculateDistanceFromSteps(steps);
+        const timeHours = (safePrev.time || 0) / 60;
         const newCalories = calculateCaloriesMET(timeHours, userWeight, 3.5);
-        
+
         const newStats = {
-          ...prev,
-          steps: newSteps,
+          ...safePrev,
+          steps,
           distance: newDistance,
           calories: newCalories,
           lastUpdated: new Date().toISOString(),
         };
-        
-        // Save to storage
+
         const dateKey = getDateKey();
         const storageKey = `dailyStats_${dateKey}`;
         saveData(storageKey, newStats);
-        
+
         return newStats;
       });
-      
-      setStepCount((prev) => prev + result.steps);
-    });
+
+      setStepCount(baseSteps + (result?.steps ?? 0));
+    }) : null;
     
     subscriptionRef.current = sub;
     setSubscription(sub);
-    console.log('Step tracking subscription started');
+    if (usePedometer) console.log('Step tracking subscription started');
 
     // Time elapsed (active walking) – update every minute
     timeIntervalRef.current = setInterval(() => {
@@ -780,11 +809,12 @@ export const AppProvider = ({ children }) => {
       const timeHours = elapsed / 60;
 
       setDailyStats((prev) => {
+        const safePrev = prev ?? defaultDailyStats;
         const newCalories = calculateCaloriesMET(timeHours, userWeight, 3.5);
-        const newDistance = calculateDistanceFromSteps(prev.steps);
+        const newDistance = calculateDistanceFromSteps(safePrev.steps);
 
         const newStats = {
-          ...prev,
+          ...safePrev,
           time: elapsed,
           calories: newCalories,
           distance: newDistance,
@@ -923,7 +953,7 @@ export const AppProvider = ({ children }) => {
   const value = {
     stepCount,
     isTracking,
-    dailyStats,
+    dailyStats: dailyStats ?? defaultDailyStats,
     weeklyProgress,
     trackingHistory,
     totalStats,
@@ -940,10 +970,17 @@ export const AppProvider = ({ children }) => {
     // permissions
     requestActivityPermission,
     activityPermissionGranted,
-    // Health Connect
-    healthConnectReady,
-    useHealthConnect,
-    initHealthConnect,
+    // Health (Health Connect / HealthKit)
+    healthConnectReady: healthData.isReady,
+    useHealthConnect: healthData.isAvailable,
+    initHealthConnect: healthData.init,
+    requestHealthConnectPermission: healthData.retryInit,
+    openHealthConnectSettings: healthData.openSettings,
+    openSamsungHealth: healthData.openSamsungHealth,
+    needsHealthConnectScreen: healthData.needsHealthConnectScreen,
+    healthConnectAvailable: healthData.healthConnectAvailable,
+    refreshHealthConnectStatus: healthData.refreshHealthConnectStatus,
+    healthConnectPlayUrl: healthData.healthConnectPlayUrl,
     syncStepsFromSystem,
     // background service
     isBackgroundServiceRunning,
@@ -957,5 +994,33 @@ export const AppProvider = ({ children }) => {
     fetchBackendData,
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  if (healthData.isCheckingHealthConnect) {
+    return (
+      <AppContext.Provider value={value}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}>
+          <ActivityIndicator size="large" color="#8140F3" />
+        </View>
+      </AppContext.Provider>
+    );
+  }
+  // 1) HC not installed → install screen
+  // 2) HC installed but no permission → onboarding "Подключить шаги"
+  // 3) else → main app
+  const showStepsOnboarding = Platform.OS === 'android' && healthData.healthConnectAvailable === true && !healthData.isReady;
+
+  return (
+    <AppContext.Provider value={value}>
+      {healthData.needsHealthConnectScreen ? (
+        <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}><ActivityIndicator size="large" color="#8140F3" /></View>}>
+          <HealthConnectRequiredScreen />
+        </Suspense>
+      ) : showStepsOnboarding ? (
+        <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}><ActivityIndicator size="large" color="#8140F3" /></View>}>
+          <StepsOnboardingScreen />
+        </Suspense>
+      ) : (
+        children
+      )}
+    </AppContext.Provider>
+  );
 };

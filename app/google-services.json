@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1055479165109",
+    "project_id": "gen-lang-client-0136632981",
+    "storage_bucket": "gen-lang-client-0136632981.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055479165109:android:7df2e8df58d1d10e25cefc",
+        "android_client_info": {
+          "package_name": "com.walkpoint.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKdF9zyMP8HA9PYtxY-dlV7IbjZq74YcE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

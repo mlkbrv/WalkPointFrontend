@@ -18,10 +18,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 
 export default function AccountScreen() {
+  const navigation = useNavigation();
   const { totalStats, dailyStats, walletBalance, convertStepsToCoins, isSyncing } = useApp();
   const { user, logout } = useAuth();
   const [converting, setConverting] = useState(false);
@@ -32,7 +34,7 @@ export default function AccountScreen() {
   const displayEmail = user?.email || 'user@example.com';
 
   const handleConvert = async () => {
-    if (dailyStats.steps < 1) {
+    if (!dailyStats || dailyStats.steps < 1) {
       Alert.alert('No Steps', 'Walk some steps first before converting.');
       return;
     }
@@ -114,7 +116,7 @@ export default function AccountScreen() {
             <>
               <RefreshCw size={20} color="#FFFFFF" />
               <Text style={styles.convertButtonText}>
-                Convert {dailyStats.steps} Steps to Coins
+                Convert {(dailyStats?.steps ?? 0)} Steps to Coins
               </Text>
             </>
           )}
@@ -122,6 +124,13 @@ export default function AccountScreen() {
 
         {/* Menu Items */}
         <View style={styles.menuSection}>
+          <Pressable
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('HowToConnectSteps')}
+          >
+            <Text style={styles.menuItemText}>Как подключить шаги</Text>
+            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+          </Pressable>
           <Pressable style={styles.menuItem}>
             <Text style={styles.menuItemText}>Settings</Text>
             <ChevronRight size={20} color="#999999" strokeWidth={2} />

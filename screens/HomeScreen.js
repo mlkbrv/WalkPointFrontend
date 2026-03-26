@@ -1,22 +1,28 @@
 import { StatusBar } from 'expo-status-bar';
-import { Clock, Coins, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { AlertCircle, Clock, Coins, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from 'react-native';
+import DeviceInfo from 'react-native-device-info';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { useApp } from '../context/AppContext';
 import { getStories, viewStory } from '../services/apiService';
+import { clearGoogleFitDeniedCooldown } from '../services/googleFitSteps';
 
 const { width } = Dimensions.get('window');
+
+const GOOGLE_FIT_PACKAGE = 'com.google.android.apps.fitness';
+const GOOGLE_FIT_PLAY_URL = `https://play.google.com/store/apps/details?id=${GOOGLE_FIT_PACKAGE}`;
 
 function HomeScreen() {
   const {
@@ -25,14 +31,27 @@ function HomeScreen() {
     updateWeeklyProgress,
     walletBalance,
     refreshWallet,
-    startStepTracking,
+    useHealthConnect,
+    healthConnectAvailable,
+    healthConnectReady,
+    requestHealthConnectPermission,
+    openHealthConnectSettings,
+    openSamsungHealth,
   } = useApp();
 
-  useFocusEffect(
-    useCallback(() => {
-      startStepTracking();
-    }, [startStepTracking])
-  );
+  const safeDailyStats = dailyStats ?? { steps: 0, time: 0, calories: 0, distance: 0 };
+  const isSamsungDevice =
+    Platform.OS === 'android' &&
+    DeviceInfo.getManufacturerSync().toLowerCase() === 'samsung';
+  const showHealthConnectBanner = Platform.OS === 'android' && useHealthConnect && healthConnectAvailable === true && !healthConnectReady;
+  const showStepsNotShowing =
+    Platform.OS === 'android' &&
+    useHealthConnect &&
+    healthConnectAvailable !== null &&
+    safeDailyStats.steps === 0 &&
+    (healthConnectReady || healthConnectAvailable === false);
+
+  // Step counting is started once when MainTabs mount (see App.jsx).
 
   const [goal] = useState(16000);
   const [stories, setStories] = useState([]);
@@ -63,10 +82,21 @@ function HomeScreen() {
         week.push({
           day: date.toLocaleDateString('en-US', { weekday: 'short' }),
           date: date.getDate(),
-          steps: i === 0 ? dailyStats.steps : 0,
+          steps: i === 0 ? safeDailyStats.steps : 0,
         });
       }
       updateWeeklyProgress(week);
+    }
+  }, []);
+
+  const openGoogleFit = useCallback(async () => {
+    if (Platform.OS !== 'android') return;
+    await clearGoogleFitDeniedCooldown();
+    const intentUrl = `intent://#Intent;package=${GOOGLE_FIT_PACKAGE};action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=${encodeURIComponent(GOOGLE_FIT_PLAY_URL)};end`;
+    try {
+      await Linking.openURL(intentUrl);
+    } catch {
+      await Linking.openURL(GOOGLE_FIT_PLAY_URL);
     }
   }, []);
 
@@ -88,7 +118,7 @@ function HomeScreen() {
     }
   };
 
-  const progressPercentage = Math.min((dailyStats.steps / goal) * 100, 100);
+  const progressPercentage = Math.min((safeDailyStats.steps / goal) * 100, 100);
   const radius = 100;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercentage / 100) * circumference;
@@ -111,6 +141,18 @@ function HomeScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Health Connect: show banner so user can open permission dialog (app will then appear in Health Connect) */}
+        {showHealthConnectBanner && (
+          <Pressable
+            style={styles.healthConnectBanner}
+            onPress={() => requestHealthConnectPermission?.()}
+          >
+            <Text style={styles.healthConnectBannerText}>
+              Подключите Health Connect для синхронизации шагов
+            </Text>
+            <Text style={styles.healthConnectBannerButton}>Подключить</Text>
+          </Pressable>
+        )}
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -212,30 +254,68 @@ function HomeScreen() {
               />
             </Svg>
             <View style={styles.innerCircle}>
-              <Text style={styles.stepNumber}>{dailyStats.steps}</Text>
+              <Text style={styles.stepNumber}>{safeDailyStats.steps}</Text>
               <Text style={styles.stepLabel}>Steps</Text>
               <Text style={styles.goalText}>{goal.toLocaleString()}</Text>
             </View>
           </View>
         </View>
 
+        {showStepsNotShowing && (
+          <View style={styles.stepsNotShowingCard}>
+            <AlertCircle size={20} color="#F59E0B" strokeWidth={2} style={styles.stepsNotShowingIcon} />
+            <Text style={styles.stepsNotShowingTitle}>Шаги не показываются</Text>
+            <Text style={styles.stepsNotShowingText}>
+              {healthConnectAvailable === false
+                ? 'На этом устройстве Health Connect недоступен. Убедитесь, что в Google Fit за сегодня есть шаги и вы вошли в тот же аккаунт Google.'
+                : isSamsungDevice
+                  ? 'Проверьте, что источники шагов (Samsung Health и др.) подключены к Health Connect и синхронизируют данные.'
+                  : 'Проверьте Health Connect и Google Fit: шаги должны попадать хотя бы в один из источников.'}
+            </Text>
+            <View style={styles.stepsNotShowingButtons}>
+              {healthConnectAvailable === true && (
+                <Pressable
+                  style={styles.stepsNotShowingBtn}
+                  onPress={() => openHealthConnectSettings?.()}
+                >
+                  <Text style={styles.stepsNotShowingBtnText}>Открыть Health Connect</Text>
+                </Pressable>
+              )}
+              {isSamsungDevice ? (
+                <Pressable
+                  style={[styles.stepsNotShowingBtn, styles.stepsNotShowingBtnSecondary]}
+                  onPress={() => openSamsungHealth?.()}
+                >
+                  <Text style={styles.stepsNotShowingBtnTextSecondary}>Открыть Samsung Health</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[styles.stepsNotShowingBtn, styles.stepsNotShowingBtnSecondary]}
+                  onPress={openGoogleFit}
+                >
+                  <Text style={styles.stepsNotShowingBtnTextSecondary}>Открыть Google Fit</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
         {/* Metrics */}
         <View style={styles.metricsContainer}>
           <View style={styles.metricItem}>
             <Clock size={32} color="#FF9800" strokeWidth={2} />
             <Text style={styles.metricValue}>
-              {Math.floor(dailyStats.time / 60)}h {dailyStats.time % 60}m
+              {Math.floor(safeDailyStats.time / 60)}h {safeDailyStats.time % 60}m
             </Text>
             <Text style={styles.metricLabel}>time</Text>
           </View>
           <View style={styles.metricItem}>
             <Flame size={32} color="#F44336" strokeWidth={2} />
-            <Text style={styles.metricValue}>{dailyStats.calories}</Text>
+            <Text style={styles.metricValue}>{safeDailyStats.calories}</Text>
             <Text style={styles.metricLabel}>kcal</Text>
           </View>
           <View style={styles.metricItem}>
             <MapPin size={32} color="#4CAF50" strokeWidth={2} />
-            <Text style={styles.metricValue}>{dailyStats.distance.toFixed(2)}</Text>
+            <Text style={styles.metricValue}>{safeDailyStats.distance.toFixed(2)}</Text>
             <Text style={styles.metricLabel}>km</Text>
           </View>
         </View>
@@ -322,6 +402,30 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  healthConnectBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EDE7F6',
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1C4E9',
+  },
+  healthConnectBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#311B92',
+    marginRight: 12,
+  },
+  healthConnectBannerButton: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8140F3',
   },
   header: {
     flexDirection: 'row',
@@ -448,6 +552,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999999',
     fontWeight: '400',
+  },
+  stepsNotShowingCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  stepsNotShowingIcon: {
+    marginBottom: 8,
+  },
+  stepsNotShowingTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 8,
+  },
+  stepsNotShowingText: {
+    fontSize: 14,
+    color: '#78350F',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  stepsNotShowingButtons: {
+    gap: 10,
+  },
+  stepsNotShowingBtn: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  stepsNotShowingBtnSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  stepsNotShowingBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  stepsNotShowingBtnTextSecondary: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#92400E',
   },
   metricsContainer: {
     flexDirection: 'row',

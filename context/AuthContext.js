@@ -37,11 +37,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
-    await apiLogin(email, password);
-    const profile = await getProfile();
-    setUser(profile);
-    setIsAuthenticated(true);
-    return profile;
+    try {
+      await apiLogin(email, password);
+      const profile = await getProfile();
+      setUser(profile);
+      setIsAuthenticated(true);
+      return profile;
+    } catch (err) {
+      console.error('Login failed', err);
+      throw err;
+    }
   };
 
   const register = async ({ email, password, first_name, last_name }) => {

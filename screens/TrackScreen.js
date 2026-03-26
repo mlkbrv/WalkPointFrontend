@@ -1,4 +1,3 @@
-import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { Clock, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
@@ -25,14 +24,11 @@ export default function TrackScreen() {
     setCurrentRoute,
     setIsTrackingRoute,
     addTrackingSession,
-    startStepTracking,
   } = useApp();
 
-  useFocusEffect(
-    useCallback(() => {
-      startStepTracking();
-    }, [startStepTracking])
-  );
+  const safeDailyStats = dailyStats ?? { steps: 0, time: 0, calories: 0, distance: 0 };
+
+  // Step counting is started on Home; here we only track the route on the map.
 
   const [location, setLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
@@ -122,10 +118,10 @@ export default function TrackScreen() {
       const session = {
         id: Date.now(),
         date: new Date().toISOString(),
-        steps: dailyStats.steps,
+        steps: safeDailyStats.steps,
         time: duration,
-        calories: dailyStats.calories,
-        distance: routeDistance > 0 ? routeDistance : dailyStats.distance, // Use GPS distance if available
+        calories: safeDailyStats.calories,
+        distance: routeDistance > 0 ? routeDistance : safeDailyStats.distance, // Use GPS distance if available
         route: routeCoordinates,
       };
       addTrackingSession(session);
@@ -250,24 +246,24 @@ export default function TrackScreen() {
       <View style={styles.statsCard}>
         <View style={styles.statItem}>
           <Footprints size={28} color="#2196F3" strokeWidth={2} />
-          <Text style={styles.statValue}>{dailyStats.steps.toLocaleString()}</Text>
+          <Text style={styles.statValue}>{safeDailyStats.steps.toLocaleString()}</Text>
           <Text style={styles.statLabel}>steps</Text>
         </View>
         <View style={styles.statItem}>
           <Clock size={28} color="#FF9800" strokeWidth={2} />
           <Text style={styles.statValue}>
-            {Math.floor(dailyStats.time / 60)}h {dailyStats.time % 60}m
+            {Math.floor(safeDailyStats.time / 60)}h {safeDailyStats.time % 60}m
           </Text>
           <Text style={styles.statLabel}>time</Text>
         </View>
         <View style={styles.statItem}>
           <Flame size={28} color="#F44336" strokeWidth={2} />
-          <Text style={styles.statValue}>{dailyStats.calories}</Text>
+          <Text style={styles.statValue}>{safeDailyStats.calories}</Text>
           <Text style={styles.statLabel}>kcal</Text>
         </View>
         <View style={styles.statItem}>
           <MapPin size={28} color="#4CAF50" strokeWidth={2} />
-          <Text style={styles.statValue}>{dailyStats.distance.toFixed(2)}</Text>
+          <Text style={styles.statValue}>{safeDailyStats.distance.toFixed(2)}</Text>
           <Text style={styles.statLabel}>km</Text>
         </View>
       </View>
@@ -279,7 +275,7 @@ export default function TrackScreen() {
           onPress={handleStopPress}
         >
           <Text style={styles.stopButtonText}>
-            {isTrackingRoute ? 'Stop' : 'Start Tracking'}
+            {isTrackingRoute ? 'Остановить маршрут' : 'Начать маршрут'}
           </Text>
         </Pressable>
       </View>
