@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, Download, ExternalLink, Info, Send } from 'lucide-react-native';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Dimensions,
@@ -28,28 +29,36 @@ const CARD_SHADOW = {
 };
 
 export default function CouponDetailScreen({ route, navigation }) {
+  const { t, i18n } = useTranslation();
   const coupon = route.params?.coupon || {};
-  const title = coupon.template_title || coupon.title || 'Offer';
-  const partner = coupon.partner_name || 'Partner';
+  const title = coupon.template_title || coupon.title || t('market.offerFallback');
+  const partner = coupon.partner_name || t('common.partner');
   const code = coupon.unique_code || coupon.code || '—';
   const validUntil = coupon.valid_until || coupon.expires_at || coupon.created_at;
-  const description = coupon.description || `Get this offer at your next ${partner} visit.`;
+  const description =
+    coupon.description || t('couponDetail.descFallback', { partner });
 
   const formatDate = (d) => {
     if (!d) return '';
     const date = new Date(d);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const locale = i18n.language === 'ru' ? 'ru-RU' : 'en-GB';
+    return date.toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
   const handleSave = () => {
-    Alert.alert('Saved', 'Coupon details saved.');
+    Alert.alert(t('couponDetail.savedTitle'), t('couponDetail.savedMessage'));
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `${title} – ${partner}\nCode: ${code}\nValid until: ${formatDate(validUntil)}`,
-        title: `${partner} Coupon`,
+        message: t('couponDetail.shareMessage', {
+          title,
+          partner,
+          code,
+          date: formatDate(validUntil),
+        }),
+        title: t('couponDetail.shareTitle', { partner }),
       });
     } catch {
       // user cancelled
@@ -65,7 +74,7 @@ export default function CouponDetailScreen({ route, navigation }) {
         <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color="#FFF" />
         </Pressable>
-        <Text style={styles.headerTitle}>Generate PIN & QR Code</Text>
+        <Text style={styles.headerTitle}>{t('couponDetail.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -87,9 +96,9 @@ export default function CouponDetailScreen({ route, navigation }) {
               </View>
             </View>
             <View style={styles.terms}>
-              <Text style={styles.term}>• Redeemable at all {partner} locations.</Text>
-              <Text style={styles.term}>• Not valid with any other discounts and promotions.</Text>
-              <Text style={styles.term}>• No cash value.</Text>
+              <Text style={styles.term}>{t('couponDetail.term1', { partner })}</Text>
+              <Text style={styles.term}>{t('couponDetail.term2')}</Text>
+              <Text style={styles.term}>{t('couponDetail.term3')}</Text>
             </View>
           </View>
           <View style={styles.dashedLine} />
@@ -106,26 +115,25 @@ export default function CouponDetailScreen({ route, navigation }) {
             </View>
             <View style={styles.validRow}>
               <Pressable><ExternalLink size={18} color="#9ca3af" /></Pressable>
-              <Text style={styles.validText}>Valid until {formatDate(validUntil)}</Text>
+              <Text style={styles.validText}>
+                {t('couponDetail.validUntil', { date: formatDate(validUntil) })}
+              </Text>
               <Pressable><Info size={18} color="#9ca3af" /></Pressable>
             </View>
           </View>
         </View>
 
-        <Text style={styles.usageTitle}>Usage Instructions</Text>
-        <Text style={styles.usagePara}>
-          PIN & QR Code are unique and different for each player. You can invite your friends to
-          play quizzes on one server with the code above.
-        </Text>
+        <Text style={styles.usageTitle}>{t('couponDetail.usageTitle')}</Text>
+        <Text style={styles.usagePara}>{t('couponDetail.usageText')}</Text>
 
         <View style={styles.actions}>
           <Pressable style={styles.saveBtn} onPress={handleSave}>
             <Download size={20} color="#FFF" />
-            <Text style={styles.saveBtnText}>Save</Text>
+            <Text style={styles.saveBtnText}>{t('common.save')}</Text>
           </Pressable>
           <Pressable style={styles.shareBtn} onPress={handleShare}>
             <Send size={20} color="#FFF" />
-            <Text style={styles.shareBtnText}>Share</Text>
+            <Text style={styles.shareBtnText}>{t('common.share')}</Text>
           </Pressable>
         </View>
       </ScrollView>

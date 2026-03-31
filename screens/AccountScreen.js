@@ -19,23 +19,26 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { setAppLanguage } from '../i18n/config';
 
 export default function AccountScreen() {
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const { totalStats, dailyStats, walletBalance, convertStepsToCoins, isSyncing } = useApp();
   const { user, logout } = useAuth();
   const [converting, setConverting] = useState(false);
 
   const displayName = user
-    ? [user.first_name, user.last_name].filter(Boolean).join(' ') || 'User'
-    : 'User';
+    ? [user.first_name, user.last_name].filter(Boolean).join(' ') || t('account.userFallback')
+    : t('account.userFallback');
   const displayEmail = user?.email || 'user@example.com';
 
   const handleConvert = async () => {
     if (!dailyStats || dailyStats.steps < 1) {
-      Alert.alert('No Steps', 'Walk some steps first before converting.');
+      Alert.alert(t('account.noStepsTitle'), t('account.noStepsMessage'));
       return;
     }
     setConverting(true);
@@ -43,21 +46,38 @@ export default function AccountScreen() {
       const result = await convertStepsToCoins();
       if (result) {
         Alert.alert(
-          'Steps Converted!',
-          `You earned ${result.coins_earned} coins.\nNew balance: ${result.new_balance}`,
+          t('account.convertedTitle'),
+          t('account.convertedMessage', {
+            coins: result.coins_earned ?? result.reward_earned ?? '',
+            balance: result.new_balance ?? result.balance ?? '',
+          }),
         );
       }
     } catch (e) {
-      Alert.alert('Conversion', e.message || 'Could not convert steps.');
+      Alert.alert(t('account.conversionTitle'), e.message || t('account.conversionFailed'));
     } finally {
       setConverting(false);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => logout() },
+    Alert.alert(t('account.logoutTitle'), t('account.logoutMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('account.logOut'), style: 'destructive', onPress: () => logout() },
+    ]);
+  };
+
+  const handleLanguage = () => {
+    Alert.alert(t('account.language'), '', [
+      {
+        text: t('account.languageEnglish'),
+        onPress: () => setAppLanguage('en'),
+      },
+      {
+        text: t('account.languageRussian'),
+        onPress: () => setAppLanguage('ru'),
+      },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -70,7 +90,7 @@ export default function AccountScreen() {
           <View style={styles.logoContainer}>
             <Footprints size={24} color="#8140F3" />
           </View>
-          <Text style={styles.headerTitle}>Account</Text>
+          <Text style={styles.headerTitle}>{t('tabs.account')}</Text>
           <Pressable style={styles.menuButton}>
             <MoreVertical size={20} color="#000000" />
           </Pressable>
@@ -90,17 +110,17 @@ export default function AccountScreen() {
           <View style={styles.statCard}>
             <Coins size={24} color="#8140F3" />
             <Text style={styles.statValue}>{parseFloat(walletBalance).toFixed(0)}</Text>
-            <Text style={styles.statLabel}>Coins</Text>
+            <Text style={styles.statLabel}>{t('account.coins')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{totalStats.steps.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Total Steps</Text>
+            <Text style={styles.statLabel}>{t('account.totalSteps')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>
               {Math.floor(totalStats.time / 60)}h
             </Text>
-            <Text style={styles.statLabel}>Total Time</Text>
+            <Text style={styles.statLabel}>{t('account.totalTime')}</Text>
           </View>
         </View>
 
@@ -116,7 +136,7 @@ export default function AccountScreen() {
             <>
               <RefreshCw size={20} color="#FFFFFF" />
               <Text style={styles.convertButtonText}>
-                Convert {(dailyStats?.steps ?? 0)} Steps to Coins
+                {t('account.convertSteps', { count: dailyStats?.steps ?? 0 })}
               </Text>
             </>
           )}
@@ -128,29 +148,35 @@ export default function AccountScreen() {
             style={styles.menuItem}
             onPress={() => navigation.navigate('HowToConnectSteps')}
           >
-            <Text style={styles.menuItemText}>Как подключить шаги</Text>
+            <Text style={styles.menuItemText}>{t('account.howToSteps')}</Text>
+            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+          </Pressable>
+          <Pressable style={styles.menuItem} onPress={handleLanguage}>
+            <Text style={styles.menuItemText}>
+              {t('account.language')} ({i18n.language === 'ru' ? 'RU' : 'EN'})
+            </Text>
             <ChevronRight size={20} color="#999999" strokeWidth={2} />
           </Pressable>
           <Pressable style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Settings</Text>
+            <Text style={styles.menuItemText}>{t('account.settings')}</Text>
             <ChevronRight size={20} color="#999999" strokeWidth={2} />
           </Pressable>
           <Pressable style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Notifications</Text>
+            <Text style={styles.menuItemText}>{t('account.notifications')}</Text>
             <ChevronRight size={20} color="#999999" strokeWidth={2} />
           </Pressable>
           <Pressable style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Privacy</Text>
+            <Text style={styles.menuItemText}>{t('account.privacy')}</Text>
             <ChevronRight size={20} color="#999999" strokeWidth={2} />
           </Pressable>
           <Pressable style={styles.menuItem}>
-            <Text style={styles.menuItemText}>About</Text>
+            <Text style={styles.menuItemText}>{t('account.about')}</Text>
             <ChevronRight size={20} color="#999999" strokeWidth={2} />
           </Pressable>
           <Pressable style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout}>
             <View style={styles.logoutRow}>
               <LogOut size={20} color="#F44336" />
-              <Text style={styles.logoutText}>Log Out</Text>
+              <Text style={styles.logoutText}>{t('account.logOut')}</Text>
             </View>
             <ChevronRight size={20} color="#F44336" strokeWidth={2} />
           </Pressable>

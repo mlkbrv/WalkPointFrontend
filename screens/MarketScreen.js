@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { getCoupons } from '../services/apiService';
 
 const STEPS_DEFAULT = 5000;
@@ -22,6 +23,7 @@ const CARD_SHADOW = {
 };
 
 export default function MarketScreen({ navigation }) {
+  const { t } = useTranslation();
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,9 +52,13 @@ export default function MarketScreen({ navigation }) {
 
   const renderCoupon = ({ item }) => {
     const steps = item.steps_to_redeem ?? item.steps_required ?? (parseFloat(item.price) ? undefined : STEPS_DEFAULT);
-    const stepsLabel = steps ? `${Number(steps).toLocaleString()} Steps` : (item.price ? `${Math.round(parseFloat(item.price))}c` : '—');
-    const offer = item.title || item.template_title || 'Offer';
-    const partner = item.partner_name || 'Partner';
+    const stepsLabel = steps
+      ? t('market.stepsPrice', { steps: Number(steps).toLocaleString() })
+      : item.price
+        ? t('market.coinsShort', { coins: Math.round(parseFloat(item.price)) })
+        : t('common.notAvailable');
+    const offer = item.title || item.template_title || t('market.offerFallback');
+    const partner = item.partner_name || t('common.partner');
     const category = item.category || item.description || '';
     const brandColors = ['#00704A', '#E31837', '#FFC72C', '#8140F3', '#2196F3', '#9C27B0'];
     const colorIndex = (partner.length + (item.id || 0)) % brandColors.length;
@@ -76,7 +82,7 @@ export default function MarketScreen({ navigation }) {
           </View>
           <View style={styles.getButton}>
             <ShoppingBag size={18} color="#FFF" />
-            <Text style={styles.getButtonText}>Get</Text>
+            <Text style={styles.getButtonText}>{t('common.get')}</Text>
           </View>
         </View>
       </Pressable>
@@ -90,7 +96,7 @@ export default function MarketScreen({ navigation }) {
         <Pressable style={styles.headerBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color="#1a1a1a" />
         </Pressable>
-        <Text style={styles.headerTitle}>Coupones Store</Text>
+        <Text style={styles.headerTitle}>{t('market.title')}</Text>
         <Pressable style={styles.headerBtn}>
           <Menu size={24} color="#1a1a1a" />
         </Pressable>
@@ -102,7 +108,7 @@ export default function MarketScreen({ navigation }) {
         </View>
       ) : coupons.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyText}>No coupons available yet</Text>
+          <Text style={styles.emptyText}>{t('market.empty')}</Text>
         </View>
       ) : (
         <FlatList

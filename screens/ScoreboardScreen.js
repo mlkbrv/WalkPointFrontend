@@ -10,10 +10,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { getLeaderboard } from '../services/apiService';
 
 function ScoreboardScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [currentUserRank, setCurrentUserRank] = useState(null);
@@ -29,7 +31,7 @@ function ScoreboardScreen() {
       const data = await getLeaderboard();
       const entries = (Array.isArray(data) ? data : data.results || []).map((entry) => ({
         id: entry.user_id,
-        name: [entry.first_name, entry.last_name].filter(Boolean).join(' ') || 'User',
+        name: [entry.first_name, entry.last_name].filter(Boolean).join(' ') || t('account.userFallback'),
         score: entry.total_steps || 0,
         avatar: '👤',
         isCurrentUser: user && entry.user_id === user.id,
@@ -39,7 +41,7 @@ function ScoreboardScreen() {
       if (!hasCurrentUser && user) {
         entries.push({
           id: user.id,
-          name: [user.first_name, user.last_name].filter(Boolean).join(' ') || 'You',
+          name: [user.first_name, user.last_name].filter(Boolean).join(' ') || t('scoreboard.you'),
           score: 0,
           avatar: '👤',
           isCurrentUser: true,
@@ -74,7 +76,7 @@ function ScoreboardScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, t]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -101,7 +103,7 @@ function ScoreboardScreen() {
           <Pressable style={styles.backButton}>
             <X size={24} color="#000000" />
           </Pressable>
-          <Text style={styles.headerTitle}>Weekly Scoreboard</Text>
+          <Text style={styles.headerTitle}>{t('scoreboard.title')}</Text>
           <View style={styles.placeholder} />
         </View>
 
@@ -248,19 +250,23 @@ function ScoreboardScreen() {
             <View style={styles.currentUserDivider} />
             <View style={styles.currentUserInfo}>
               <Text style={styles.currentUserRankText}>
-                You are #{currentUserRank}
+                {t('scoreboard.youAre', { rank: currentUserRank })}
               </Text>
               <View style={styles.currentUserNeighbors}>
                 {currentUserRank > 1 && (
                   <Text style={styles.neighborText}>
-                    Above: {users[currentUserRank - 2].name} (
-                    {users[currentUserRank - 2].score.toLocaleString()})
+                    {t('scoreboard.above', {
+                      name: users[currentUserRank - 2].name,
+                      score: users[currentUserRank - 2].score.toLocaleString(),
+                    })}
                   </Text>
                 )}
                 {currentUserRank < users.length && (
                   <Text style={styles.neighborText}>
-                    Below: {users[currentUserRank].name} (
-                    {users[currentUserRank].score.toLocaleString()})
+                    {t('scoreboard.below', {
+                      name: users[currentUserRank].name,
+                      score: users[currentUserRank].score.toLocaleString(),
+                    })}
                   </Text>
                 )}
               </View>
@@ -272,11 +278,11 @@ function ScoreboardScreen() {
         <View style={styles.actionButtons}>
           <Pressable style={styles.saveButton}>
             <Save size={20} color="#8140F3" strokeWidth={2} />
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={styles.saveButtonText}>{t('common.save')}</Text>
           </Pressable>
           <Pressable style={styles.shareButton}>
             <Share2 size={20} color="#8140F3" strokeWidth={2} />
-            <Text style={styles.shareButtonText}>Share</Text>
+            <Text style={styles.shareButtonText}>{t('common.share')}</Text>
           </Pressable>
         </View>
       </ScrollView>

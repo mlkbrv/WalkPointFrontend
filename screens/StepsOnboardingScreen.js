@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Platform,
   Pressable,
@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Footprints } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 
 export default function StepsOnboardingScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { requestHealthConnectPermission, openHealthConnectSettings } = useApp();
 
@@ -18,7 +20,13 @@ export default function StepsOnboardingScreen() {
     await requestHealthConnectPermission?.();
   };
 
-  if (Platform.OS !== 'android') return null;
+  if (Platform.OS !== 'android' && Platform.OS !== 'ios') return null;
+
+  const isIos = Platform.OS === 'ios';
+
+  const title = useMemo(() => (isIos ? t('onboarding.titleIos') : t('onboarding.titleAndroid')), [isIos, t]);
+  const subtitle = useMemo(() => (isIos ? t('onboarding.subtitleIos') : t('onboarding.subtitleAndroid')), [isIos, t]);
+  const hint = useMemo(() => (isIos ? t('onboarding.hintIos') : t('onboarding.hintAndroid')), [isIos, t]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
@@ -26,31 +34,30 @@ export default function StepsOnboardingScreen() {
         <View style={styles.iconWrapper}>
           <Footprints size={72} color="#8140F3" strokeWidth={2} />
         </View>
-        <Text style={styles.title}>Подключите шаги</Text>
-        <Text style={styles.subtitle}>
-          WalkPoint получает данные о шагах из Health Connect.{'\n\n'}
-          Сначала откройте Health Connect (кнопка ниже), затем нажмите «Подключить шаги» — в окне выберите WalkPoint и разрешите доступ к шагам.
-        </Text>
-        <Pressable
-          style={styles.openHealthButton}
-          onPress={() => openHealthConnectSettings?.()}
-          android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
-        >
-          <Text style={styles.openHealthButtonText}>Открыть Health Connect</Text>
-        </Pressable>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
+        {!isIos && (
+          <Pressable
+            style={styles.openHealthButton}
+            onPress={() => openHealthConnectSettings?.()}
+            android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
+          >
+            <Text style={styles.openHealthButtonText}>{t('onboarding.openHc')}</Text>
+          </Pressable>
+        )}
         <Pressable
           style={styles.connectButton}
           onPress={handleConnectSteps}
           android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
         >
-          <Text style={styles.connectButtonText}>Подключить шаги</Text>
+          <Text style={styles.connectButtonText}>
+            {isIos ? t('onboarding.allowAccess') : t('onboarding.connectSteps')}
+          </Text>
         </Pressable>
-        <Text style={styles.hint}>
-          Если WalkPoint не появляется в списке: полностью закройте приложение Health Connect (смахните из недавних) и откройте его снова, затем снова нажмите «Подключить шаги».
-        </Text>
-        <Text style={styles.hintSecondary}>
-          Samsung Health: подключите его к Health Connect в настройках Samsung Health.
-        </Text>
+        <Text style={styles.hint}>{hint}</Text>
+        {!isIos && (
+          <Text style={styles.hintSecondary}>{t('onboarding.hintSamsung')}</Text>
+        )}
       </View>
     </View>
   );

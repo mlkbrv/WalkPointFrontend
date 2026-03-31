@@ -12,8 +12,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSMotionUsageDescription": "WalkPoint uses your device's step counter to track daily steps and reward you. Data stays on your device.",
-        "NSHealthShareUsageDescription": "WalkPoint reads your step count from Apple Health to track daily steps and reward you.",
-        "NSHealthUpdateUsageDescription": "WalkPoint can save step data to Apple Health to keep your health history in sync.",
+        "NSHealthShareUsageDescription": "WalkPoint reads your steps, weight, and height from Apple Health to track activity and estimate calories burned.",
+        "NSHealthUpdateUsageDescription": "WalkPoint can write health data to Apple Health when you use related features.",
         "NSLocationWhenInUseUsageDescription": "WalkPoint uses your location only when you start a route to show your path on the map.",
         "NSLocationAlwaysUsageDescription": "WalkPoint uses your location in the background only when you are actively tracking a route.",
         "UIBackgroundModes": [
@@ -90,6 +90,13 @@
       "./plugins/withHealthConnectPermissions",
       "./plugins/withHealthConnectMainActivity",
       "react-native-health-connect",
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "WalkPoint reads your steps, weight, and height from Apple Health to track activity and estimate calories burned.",
+          "healthUpdatePermission": "WalkPoint can write health data to Apple Health when you use related features."
+        }
+      ],
       "./plugins/withHealthConnectMainActivityManifest",
       [
         "react-native-permissions",

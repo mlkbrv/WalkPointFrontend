@@ -11,12 +11,14 @@ import {
   View,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { calculateRouteDistance } from '../utils/calculations';
 
 const { width, height } = Dimensions.get('window');
 
 export default function TrackScreen() {
+  const { t } = useTranslation();
   const {
     dailyStats,
     currentRoute,
@@ -40,14 +42,14 @@ export default function TrackScreen() {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required for tracking.');
+        Alert.alert(t('track.locationDeniedTitle'), t('track.locationDeniedMessage'));
         return;
       }
 
       const loc = await Location.getCurrentPositionAsync({});
       setLocation(loc);
     })();
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let subscription = null;
@@ -213,7 +215,7 @@ export default function TrackScreen() {
         <View style={styles.logoContainer}>
           <Footprints size={24} color="#8140F3" />
         </View>
-        <Text style={styles.headerTitle}>Track</Text>
+        <Text style={styles.headerTitle}>{t('tabs.track')}</Text>
         <Pressable style={styles.menuButton}>
           <MoreVertical size={20} color="#000000" />
         </Pressable>
@@ -237,7 +239,7 @@ export default function TrackScreen() {
         ) : (
           <View style={styles.mapPlaceholder}>
             <Text style={styles.mapPlaceholderText}>📍</Text>
-            <Text style={styles.mapPlaceholderLabel}>Getting your location...</Text>
+            <Text style={styles.mapPlaceholderLabel}>{t('track.gettingLocation')}</Text>
           </View>
         )}
       </View>
@@ -247,24 +249,24 @@ export default function TrackScreen() {
         <View style={styles.statItem}>
           <Footprints size={28} color="#2196F3" strokeWidth={2} />
           <Text style={styles.statValue}>{safeDailyStats.steps.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>steps</Text>
+          <Text style={styles.statLabel}>{t('track.steps')}</Text>
         </View>
         <View style={styles.statItem}>
           <Clock size={28} color="#FF9800" strokeWidth={2} />
           <Text style={styles.statValue}>
             {Math.floor(safeDailyStats.time / 60)}h {safeDailyStats.time % 60}m
           </Text>
-          <Text style={styles.statLabel}>time</Text>
+          <Text style={styles.statLabel}>{t('home.time')}</Text>
         </View>
         <View style={styles.statItem}>
           <Flame size={28} color="#F44336" strokeWidth={2} />
           <Text style={styles.statValue}>{safeDailyStats.calories}</Text>
-          <Text style={styles.statLabel}>kcal</Text>
+          <Text style={styles.statLabel}>{t('home.kcal')}</Text>
         </View>
         <View style={styles.statItem}>
           <MapPin size={28} color="#4CAF50" strokeWidth={2} />
           <Text style={styles.statValue}>{safeDailyStats.distance.toFixed(2)}</Text>
-          <Text style={styles.statLabel}>km</Text>
+          <Text style={styles.statLabel}>{t('home.km')}</Text>
         </View>
       </View>
 
@@ -275,7 +277,7 @@ export default function TrackScreen() {
           onPress={handleStopPress}
         >
           <Text style={styles.stopButtonText}>
-            {isTrackingRoute ? 'Остановить маршрут' : 'Начать маршрут'}
+            {isTrackingRoute ? t('track.stopRoute') : t('track.startRoute')}
           </Text>
         </Pressable>
       </View>

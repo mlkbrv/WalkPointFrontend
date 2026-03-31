@@ -64,6 +64,8 @@ const HEALTH_READ_PERMISSIONS = [
   { accessType: 'read', recordType: 'Steps' },
   { accessType: 'read', recordType: 'Distance' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
+  { accessType: 'read', recordType: 'Height' },
+  { accessType: 'read', recordType: 'Weight' },
 ];
 
 function hasStepsReadPermission(list) {
@@ -159,4 +161,65 @@ export const openSamsungHealth = async () => {
   } catch {
     await Linking.openURL(SAMSUNG_HEALTH_PLAY_URL);
   }
+};
+
+function massSampleToKg(m) {
+  if (m == null) return null;
+  if (typeof m.inKilograms === 'number' && Number.isFinite(m.inKilograms)) return m.inKilograms;
+  if (typeof m.inGrams === 'number' && Number.isFinite(m.inGrams)) return m.inGrams / 1000;
+  if (typeof m.inPounds === 'number' && Number.isFinite(m.inPounds)) return m.inPounds * 0.453592;
+  if (m.value != null && m.unit === 'kilograms') return m.value;
+  if (m.value != null && m.unit === 'grams') return m.value / 1000;
+  if (m.value != null && m.unit === 'pounds') return m.value * 0.453592;
+  return null;
+}
+
+function lengthSampleToCm(len) {
+  if (len == null) return null;
+  if (typeof len.inMeters === 'number' && Number.isFinite(len.inMeters)) return len.inMeters * 100;
+  if (typeof len.inInches === 'number' && Number.isFinite(len.inInches)) return len.inInches * 2.54;
+  if (len.value != null && len.unit === 'meters') return len.value * 100;
+  if (len.value != null && len.unit === 'inches') return len.value * 2.54;
+  if (len.value != null && len.unit === 'feet') return len.value * 30.48;
+  return null;
+}
+
+function pickLatestByTime(records) {
+  if (!Array.isArray(records) || records.length === 0) return null;
+  return [...records].sort((a, b) => {
+    const ta = new Date(a.time || a.endTime || 0).getTime();
+    const tb = new Date(b.time || b.endTime || 0).getTime();
+    return tb - ta;
+  })[0];
+}
+
+/** Latest weight (kg) and height (cm) from Health Connect, if permitted. */
+export const getBodyProfile = async () => {
+  if (!isAvailable()) return { weightKg: null, heightCm: null };
+  const now = new Date();
+  const start = new Date(now.getTime() - 730 * 24 * 60 * 60 * 1000);
+  const range = {
+    timeRangeFilter: {
+      operator: 'between',
+      startTime: start.toISOString(),
+      endTime: now.toISOString(),
+    },
+  };
+  let weightKg = null;
+  let heightCm = null;
+  try {
+    const wResult = await HealthConnect.readRecords('Weight', range);
+    const wRec = pickLatestByTime(wResult?.records ?? wResult ?? []);
+    if (wRec?.weight != null) weightKg = massSampleToKg(wRec.weight);
+  } catch (err) {
+    console.warn('Health Connect getBodyProfile weight:', err?.message ?? err);
+  }
+  try {
+    const hResult = await HealthConnect.readRecords('Height', range);
+    const hRec = pickLatestByTime(hResult?.records ?? hResult ?? []);
+    if (hRec?.height != null) heightCm = lengthSampleToCm(hRec.height);
+  } catch (err) {
+    console.warn('Health Connect getBodyProfile height:', err?.message ?? err);
+  }
+  return { weightKg, heightCm };
 };

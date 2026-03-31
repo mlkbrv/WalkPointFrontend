@@ -11,9 +11,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 export default function RegisterScreen({ navigation }) {
+  const { t } = useTranslation();
   const { register } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -24,11 +26,11 @@ export default function RegisterScreen({ navigation }) {
 
   const handleRegister = async () => {
     if (!email || !password || !firstName) {
-      setError('Please fill in all required fields.');
+      setError(t('auth.fillRequired'));
       return;
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError(t('auth.passwordMin'));
       return;
     }
     setError('');
@@ -41,7 +43,7 @@ export default function RegisterScreen({ navigation }) {
         last_name: lastName.trim(),
       });
     } catch (e) {
-      setError(e.message || 'Registration failed');
+      setError(e.message || t('auth.registrationFailed'));
     } finally {
       setLoading(false);
     }
@@ -57,7 +59,7 @@ export default function RegisterScreen({ navigation }) {
           <View style={styles.logoCircle}>
             <Footprints size={40} color="#FFFFFF" />
           </View>
-          <Text style={styles.appName}>Create Account</Text>
+          <Text style={styles.appName}>{t('auth.createAccount')}</Text>
         </View>
 
         <View style={styles.form}>
@@ -65,21 +67,21 @@ export default function RegisterScreen({ navigation }) {
 
           <TextInput
             style={styles.input}
-            placeholder="First Name *"
+            placeholder={t('auth.firstNameRequired')}
             placeholderTextColor="#999"
             value={firstName}
             onChangeText={setFirstName}
           />
           <TextInput
             style={styles.input}
-            placeholder="Last Name"
+            placeholder={t('auth.lastName')}
             placeholderTextColor="#999"
             value={lastName}
             onChangeText={setLastName}
           />
           <TextInput
             style={styles.input}
-            placeholder="Email *"
+            placeholder={t('auth.emailRequired')}
             placeholderTextColor="#999"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -88,7 +90,7 @@ export default function RegisterScreen({ navigation }) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Password * (min 8 chars)"
+            placeholder={t('auth.passwordHint')}
             placeholderTextColor="#999"
             secureTextEntry
             value={password}
@@ -103,13 +105,14 @@ export default function RegisterScreen({ navigation }) {
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.buttonText}>Sign Up</Text>
+              <Text style={styles.buttonText}>{t('auth.signUp')}</Text>
             )}
           </Pressable>
 
           <Pressable onPress={() => navigation.goBack()}>
             <Text style={styles.linkText}>
-              Already have an account? <Text style={styles.linkBold}>Log In</Text>
+              {t('auth.haveAccount')}{' '}
+              <Text style={styles.linkBold}>{t('auth.logInBold')}</Text>
             </Text>
           </Pressable>
         </View>

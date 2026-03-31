@@ -4,6 +4,8 @@ const HEALTH_CONNECT_PERMISSIONS = [
   'android.permission.health.READ_STEPS',
   'android.permission.health.READ_DISTANCE',
   'android.permission.health.READ_ACTIVE_CALORIES_BURNED',
+  'android.permission.health.READ_HEIGHT',
+  'android.permission.health.READ_WEIGHT',
   'android.permission.health.WRITE_STEPS',
   'android.permission.health.WRITE_DISTANCE',
 ];

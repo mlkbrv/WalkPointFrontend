@@ -1,9 +1,11 @@
 import React from 'react';
 import { Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 
 export default function HealthConnectRequiredScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { refreshHealthConnectStatus, healthConnectPlayUrl } = useApp();
 
@@ -21,16 +23,13 @@ export default function HealthConnectRequiredScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.card}>
-        <Text style={styles.title}>Health Connect</Text>
-        <Text style={styles.message}>
-          Для синхронизации шагов нужен Health Connect.{'\n\n'}
-          Установите его из Google Play.
-        </Text>
+        <Text style={styles.title}>{t('onboarding.healthConnectRequiredTitle')}</Text>
+        <Text style={styles.message}>{t('onboarding.healthConnectRequiredMessage')}</Text>
         <TouchableOpacity style={styles.installButton} onPress={handleInstall} activeOpacity={0.8}>
-          <Text style={styles.installButtonText}>Установить</Text>
+          <Text style={styles.installButtonText}>{t('onboarding.install')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.retryButton} onPress={handleRetry} activeOpacity={0.8}>
-          <Text style={styles.retryButtonText}>Проверить снова</Text>
+          <Text style={styles.retryButtonText}>{t('onboarding.checkAgain')}</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -1,0 +1,243 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "settings": "Settings",
+    "ok": "OK",
+    "info": "Info",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "share": "Share",
+    "back": "Back",
+    "get": "Get",
+    "partner": "Partner",
+    "retry": "Try again",
+    "notAvailable": "N/A"
+  },
+  "tabs": {
+    "home": "Home",
+    "track": "Track",
+    "market": "Market",
+    "report": "Report",
+    "scoreboard": "Scoreboard",
+    "account": "Account"
+  },
+  "auth": {
+    "tagline": "Walk. Earn. Enjoy.",
+    "email": "Email",
+    "password": "Password",
+    "logIn": "Log In",
+    "signUpLink": "Don't have an account?",
+    "signUpBold": "Sign Up",
+    "fillAllFields": "Please fill in all fields.",
+    "loginFailed": "Login failed",
+    "createAccount": "Create Account",
+    "firstNameRequired": "First Name *",
+    "lastName": "Last Name",
+    "emailRequired": "Email *",
+    "passwordHint": "Password * (min 8 chars)",
+    "signUp": "Sign Up",
+    "haveAccount": "Already have an account?",
+    "logInBold": "Log In",
+    "fillRequired": "Please fill in all required fields.",
+    "passwordMin": "Password must be at least 8 characters.",
+    "registrationFailed": "Registration failed"
+  },
+  "appError": {
+    "title": "Something went wrong. Please restart the app.",
+    "unknown": "Unknown error"
+  },
+  "background": {
+    "taskTitle": "Step counting",
+    "taskDesc": "WalkPoint counts your steps in the background"
+  },
+  "permissions": {
+    "activityTitle": "Activity recognition",
+    "activityMessage": "WalkPoint needs access to your step sensor to count steps and reward you. Steps can be counted even when the screen is off.",
+    "askLater": "Ask later",
+    "allow": "Allow",
+    "activityDeniedTitle": "Permission denied",
+    "activityDeniedMessage": "Step counting requires activity recognition. Please enable it in app settings.",
+    "pedometerUnavailableTitle": "Pedometer unavailable",
+    "pedometerUnavailableMessage": "To count steps, allow motion & fitness access in device settings.",
+    "noPermissionTitle": "No permission",
+    "noPermissionMessage": "Step counting requires activity recognition permission.",
+    "pedometerNoDeviceTitle": "Pedometer unavailable",
+    "pedometerNoDeviceMessage": "Your device doesn't support step counting. Grant Physical Activity permission or connect Health Connect / Apple Health."
+  },
+  "healthAlerts": {
+    "iosDeniedTitle": "No Health access",
+    "iosDeniedMessage": "Allow WalkPoint to read steps, weight, and height in the Health app's privacy settings.",
+    "hcDeniedTitle": "Permissions not granted",
+    "hcDeniedMessage": "On the permissions screen, select WalkPoint and enable Steps (and weight/height if needed). The app will then appear in Health Connect.",
+    "hcSettings": "Open Health Connect"
+  },
+  "home": {
+    "connectHcBanner": "Connect Health Connect to sync steps",
+    "connectHealthBanner": "Connect Apple Health for steps and better calorie estimates",
+    "connect": "Connect",
+    "stepsNotShowingTitle": "Steps not showing",
+    "stepsNotShowingHcOff": "Health Connect isn't available on this device. Make sure Google Fit has today's steps and you're signed into the same Google account.",
+    "stepsNotShowingSamsung": "Check that step sources (Samsung Health, etc.) are linked to Health Connect and syncing.",
+    "stepsNotShowingDefault": "Check Health Connect and Google Fit — at least one source should provide steps.",
+    "openHc": "Open Health Connect",
+    "openSamsungHealth": "Open Samsung Health",
+    "openGoogleFit": "Open Google Fit",
+    "storyViewedTitle": "Already viewed",
+    "storyViewedMessage": "You already earned coins for this story.",
+    "coinsEarnedTitle": "Coins earned!",
+    "coinsEarnedMessage": "You earned {{amount}} coins.\nNew balance: {{balance}}",
+    "noStories": "No stories available",
+    "steps": "Steps",
+    "time": "time",
+    "kcal": "kcal",
+    "km": "km",
+    "yourProgress": "Your Progress",
+    "thisWeek": "This Week",
+    "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  },
+  "onboarding": {
+    "titleIos": "Connect Apple Health",
+    "titleAndroid": "Connect your steps",
+    "subtitleIos": "WalkPoint reads steps, weight, and height from the Health app for more accurate daily calories.\n\nTap “Allow access” — in the system sheet, turn on steps, weight, and height for WalkPoint.",
+    "subtitleAndroid": "WalkPoint gets steps, weight, and height from Health Connect.\n\nFirst open Health Connect (button below), then tap “Connect steps” — choose WalkPoint and allow steps (and weight/height if offered).",
+    "openHc": "Open Health Connect",
+    "connectSteps": "Connect steps",
+    "allowAccess": "Allow access",
+    "hintIos": "If the sheet doesn't appear: Settings → Privacy → Health → Data Access → WalkPoint.",
+    "hintAndroid": "If WalkPoint isn't listed: force-close the Health Connect app from recents and open it again, then tap “Connect steps” again.",
+    "hintSamsung": "Samsung Health: link it to Health Connect in Samsung Health settings.",
+    "healthConnectRequiredTitle": "Health Connect",
+    "healthConnectRequiredMessage": "To sync steps you need Health Connect.\n\nInstall it from Google Play.",
+    "install": "Install",
+    "checkAgain": "Check again"
+  },
+  "howTo": {
+    "title": "How to connect steps",
+    "subtitleAndroid": "WalkPoint uses Health Connect for step data on Android.",
+    "subtitleIos": "WalkPoint uses Apple Health for step data on iPhone.",
+    "footerAndroid": "If steps don't update, make sure your source app (Samsung Health, Google Fit, etc.) shares data with Health Connect.",
+    "androidSteps": [
+      "Open Health Connect (install from Google Play if needed).",
+      "In WalkPoint tap “Connect steps” and select WalkPoint in the list.",
+      "Enable Steps access — and weight/height if available for better calories.",
+      "If you use Samsung Health: Samsung Health → Settings → Health Connect → enable step sharing.",
+      "Done. Steps will sync automatically."
+    ],
+    "iosSteps": [
+      "In WalkPoint tap “Allow access” and enable steps, weight, and height in the sheet.",
+      "Or: Settings → Privacy → Health → Data Access → WalkPoint.",
+      "Enable Steps, Body Mass, and Height for WalkPoint for better calorie estimates.",
+      "You can add weight and height manually in Health if missing.",
+      "Done. Steps and body data will come from Apple Health."
+    ]
+  },
+  "track": {
+    "locationDeniedTitle": "Permission denied",
+    "locationDeniedMessage": "Location permission is required for route tracking.",
+    "gettingLocation": "Getting your location...",
+    "steps": "steps",
+    "startRoute": "Start route",
+    "stopRoute": "Stop route"
+  },
+  "account": {
+    "title": "Account",
+    "userFallback": "User",
+    "coins": "Coins",
+    "totalSteps": "Total Steps",
+    "totalTime": "Total Time",
+    "convertSteps": "Convert {{count}} steps to coins",
+    "howToSteps": "How to connect steps",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "about": "About",
+    "language": "Language",
+    "languageEnglish": "English",
+    "languageRussian": "Русский",
+    "logOut": "Log Out",
+    "noStepsTitle": "No steps",
+    "noStepsMessage": "Walk some steps before converting.",
+    "convertedTitle": "Steps converted!",
+    "convertedMessage": "You earned {{coins}} coins.\nNew balance: {{balance}}",
+    "conversionTitle": "Conversion",
+    "conversionFailed": "Could not convert steps.",
+    "logoutTitle": "Log out",
+    "logoutMessage": "Are you sure you want to log out?"
+  },
+  "market": {
+    "title": "Coupon Store",
+    "empty": "No coupons available yet",
+    "stepsPrice": "{{steps}} steps",
+    "coinsShort": "{{coins}}c",
+    "offerFallback": "Offer"
+  },
+  "myCoupons": {
+    "title": "My Coupons",
+    "emptyTitle": "No Coupons Yet",
+    "emptySubtitle": "Tap “Buy new coupon” below to get coupons from the store.",
+    "buyNew": "Buy new coupon",
+    "validUntil": "Valid until {{date}}"
+  },
+  "couponDetail": {
+    "title": "Generate PIN & QR Code",
+    "savedTitle": "Saved",
+    "savedMessage": "Coupon details saved.",
+    "descFallback": "Get this offer at your next {{partner}} visit.",
+    "term1": "• Redeemable at all {{partner}} locations.",
+    "term2": "• Not valid with other discounts or promotions.",
+    "term3": "• No cash value.",
+    "validUntil": "Valid until {{date}}",
+    "usageTitle": "Usage instructions",
+    "usageText": "Show this screen or QR code at checkout. Staff may ask for the PIN or scan the code.",
+    "shareMessage": "{{title}} – {{partner}}\nCode: {{code}}\nValid until: {{date}}",
+    "shareTitle": "{{partner}} coupon"
+  },
+  "couponRedeem": {
+    "insufficientTitle": "Insufficient balance",
+    "insufficientMessage": "You need {{price}} coins. Your balance: {{balance}}. Walk more to earn coins!",
+    "redeemTitle": "Redeem coupon",
+    "redeemMessage": "Spend {{price}} coins to get this coupon?",
+    "redeem": "Redeem",
+    "successTitle": "Success",
+    "successMessage": "Coupon added to My Coupons!",
+    "stepsInfo": "{{steps}} steps required. Keep walking to unlock!",
+    "stepsLabel": "Steps",
+    "confirmPurchase": "Confirm purchase",
+    "offerFallback": "Offer"
+  },
+  "report": {
+    "title": "Report",
+    "totalStepsCaption": "Total steps all time.",
+    "statistics": "Statistics",
+    "thisWeek": "This Week",
+    "yourProgress": "Your Progress",
+    "thisMonth": "This Month",
+    "allHistory": "All History",
+    "calendarWeekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "metrics": {
+      "Steps": "Steps",
+      "Time": "Time",
+      "Calorie": "Calories",
+      "Distance": "Distance"
+    }
+  },
+  "history": {
+    "title": "History",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "empty": "No tracking history yet",
+    "emptySub": "Start tracking your activities to see them here.",
+    "steps": "steps",
+    "time": "time",
+    "kcal": "kcal",
+    "km": "km"
+  },
+  "scoreboard": {
+    "title": "Weekly scoreboard",
+    "you": "You",
+    "youAre": "You are #{{rank}}",
+    "above": "Above: {{name}} ({{score}})",
+    "below": "Below: {{name}} ({{score}})"
+  }
+}

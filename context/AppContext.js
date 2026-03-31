@@ -11,11 +11,14 @@ import {
   getWallet,
 } from '../services/apiService';
 import { getGoogleFitTodaySteps } from '../services/googleFitSteps';
+import * as healthService from '../services/healthService';
 import {
   calculateCaloriesMET,
   calculateDistanceFromSteps,
+  calculateWalkingCaloriesFromSteps,
   getDateKey
 } from '../utils/calculations';
+import i18n from '../i18n/config';
 // Lazy to avoid require cycle: AppContext -> HealthConnectRequiredScreen -> useApp (AppContext)
 const HealthConnectRequiredScreen = lazy(() => import('../screens/HealthConnectRequiredScreen'));
 const StepsOnboardingScreen = lazy(() => import('../screens/StepsOnboardingScreen'));
@@ -89,8 +92,6 @@ const BACKGROUND_STEP_TASK = 'background-step-tracking';
 // Background service configuration for Android foreground service
 const backgroundServiceOptions = {
   taskName: 'WalkPoint',
-  taskTitle: 'Подсчёт шагов',
-  taskDesc: 'WalkPoint считает ваши шаги в фоновом режиме',
   taskIcon: {
     name: 'ic_launcher',
     type: 'mipmap',
@@ -139,9 +140,22 @@ TaskManager.defineTask(BACKGROUND_STEP_TASK, async ({ data, error }) => {
           // keep current
         }
 
-        const timeHours = currentStats.time / 60;
-        const newCalories = calculateCaloriesMET(timeHours, 75, 3.5);
-        const newDistance = calculateDistanceFromSteps(newSteps);
+        let weightKg = 75;
+        let heightCm = null;
+        try {
+          const ws = await AsyncStorage.getItem('userBodyWeightKg');
+          const hs = await AsyncStorage.getItem('userBodyHeightCm');
+          if (ws != null) {
+            const n = parseFloat(ws, 10);
+            if (Number.isFinite(n) && n > 20) weightKg = n;
+          }
+          if (hs != null) {
+            const n = parseFloat(hs, 10);
+            if (Number.isFinite(n) && n > 40) heightCm = n;
+          }
+        } catch (_) {}
+        const newCalories = calculateWalkingCaloriesFromSteps(newSteps, weightKg, heightCm);
+        const newDistance = calculateDistanceFromSteps(newSteps, heightCm);
 
         const updatedStats = {
           ...currentStats,
@@ -205,7 +219,8 @@ export const AppProvider = ({ children }) => {
   const [isTrackingRoute, setIsTrackingRoute] = useState(false);
   const [timeTrackingInterval, setTimeTrackingInterval] = useState(null);
   const [trackingStartTime, setTrackingStartTime] = useState(null);
-  const [userWeight] = useState(75);
+  const [bodyProfile, setBodyProfile] = useState({ weightKg: 75, heightCm: null });
+  const bodyProfileRef = useRef({ weightKg: 75, heightCm: null });
   const subscriptionRef = useRef(null);
   const timeIntervalRef = useRef(null);
   const syncIntervalRef = useRef(null);
@@ -221,6 +236,30 @@ export const AppProvider = ({ children }) => {
   const healthData = useHealthData();
 
   dailyStatsRef.current = dailyStats ?? defaultDailyStats;
+
+  useEffect(() => {
+    bodyProfileRef.current = bodyProfile;
+  }, [bodyProfile]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const w = await AsyncStorage.getItem('userBodyWeightKg');
+        const h = await AsyncStorage.getItem('userBodyHeightCm');
+        const next = { weightKg: 75, heightCm: null };
+        if (w != null) {
+          const n = parseFloat(w, 10);
+          if (Number.isFinite(n) && n > 20 && n < 400) next.weightKg = n;
+        }
+        if (h != null) {
+          const n = parseFloat(h, 10);
+          if (Number.isFinite(n) && n > 40 && n < 260) next.heightCm = n;
+        }
+        bodyProfileRef.current = next;
+        setBodyProfile(next);
+      } catch (_) {}
+    })();
+  }, []);
 
   // ── Wallet / backend state ──
   const [walletBalance, setWalletBalance] = useState('0.00');
@@ -253,11 +292,11 @@ export const AppProvider = ({ children }) => {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
           {
-            title: 'Разрешение на отслеживание активности',
-            message: 'WalkPoint нужен доступ к датчику шагов для подсчёта ваших шагов и начисления наград. Шаги будут считаться даже при выключенном экране.',
-            buttonNeutral: 'Спросить позже',
-            buttonNegative: 'Отмена',
-            buttonPositive: 'Разрешить',
+            title: i18n.t('permissions.activityTitle'),
+            message: i18n.t('permissions.activityMessage'),
+            buttonNeutral: i18n.t('permissions.askLater'),
+            buttonNegative: i18n.t('common.cancel'),
+            buttonPositive: i18n.t('permissions.allow'),
           }
         );
         
@@ -267,11 +306,11 @@ export const AppProvider = ({ children }) => {
           return true;
         } else if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
           Alert.alert(
-            'Разрешение отклонено',
-            'Для подсчёта шагов необходимо разрешение на отслеживание активности. Пожалуйста, включите его в настройках приложения.',
+            i18n.t('permissions.activityDeniedTitle'),
+            i18n.t('permissions.activityDeniedMessage'),
             [
-              { text: 'Отмена', style: 'cancel' },
-              { text: 'Настройки', onPress: () => Linking.openSettings() },
+              { text: i18n.t('common.cancel'), style: 'cancel' },
+              { text: i18n.t('common.settings'), onPress: () => Linking.openSettings() },
             ]
           );
           setActivityPermissionGranted(false);
@@ -288,11 +327,11 @@ export const AppProvider = ({ children }) => {
           return true;
         }
         Alert.alert(
-          'Шагомер недоступен',
-          'Для подсчёта шагов необходимо разрешить доступ к данным о движении в настройках устройства.',
+          i18n.t('permissions.pedometerUnavailableTitle'),
+          i18n.t('permissions.pedometerUnavailableMessage'),
           [
-            { text: 'Отмена', style: 'cancel' },
-            { text: 'Настройки', onPress: () => Linking.openSettings() },
+            { text: i18n.t('common.cancel'), style: 'cancel' },
+            { text: i18n.t('common.settings'), onPress: () => Linking.openSettings() },
           ]
         );
         return false;
@@ -332,10 +371,26 @@ export const AppProvider = ({ children }) => {
           const systemStepsToday = stepResult?.steps ?? 0;
 
           if (systemStepsToday > currentStats.steps) {
-            const newDistance = calculateDistanceFromSteps(systemStepsToday);
+            let weightKg = 75;
+            let heightCm = null;
+            try {
+              const ws = await AsyncStorage.getItem('userBodyWeightKg');
+              const hs = await AsyncStorage.getItem('userBodyHeightCm');
+              if (ws != null) {
+                const n = parseFloat(ws, 10);
+                if (Number.isFinite(n) && n > 20) weightKg = n;
+              }
+              if (hs != null) {
+                const n = parseFloat(hs, 10);
+                if (Number.isFinite(n) && n > 40) heightCm = n;
+              }
+            } catch (_) {}
+            const newCalories = calculateWalkingCaloriesFromSteps(systemStepsToday, weightKg, heightCm);
+            const newDistance = calculateDistanceFromSteps(systemStepsToday, heightCm);
             const updatedStats = {
               ...currentStats,
               steps: systemStepsToday,
+              calories: newCalories,
               distance: newDistance,
               lastUpdated: new Date().toISOString(),
             };
@@ -347,6 +402,7 @@ export const AppProvider = ({ children }) => {
             const stepDiff = systemStepsToday - currentStats.steps;
             totalStats.steps += stepDiff;
             totalStats.distance = newDistance;
+            totalStats.calories = newCalories;
             await AsyncStorage.setItem('totalStats', JSON.stringify(totalStats));
             
             console.log(`Background sync: ${systemStepsToday} steps`);
@@ -372,7 +428,11 @@ export const AppProvider = ({ children }) => {
     
     try {
       if (Platform.OS === 'android') {
-        await BackgroundService.start(backgroundStepTask, backgroundServiceOptions);
+        await BackgroundService.start(backgroundStepTask, {
+          ...backgroundServiceOptions,
+          taskTitle: i18n.t('background.taskTitle'),
+          taskDesc: i18n.t('background.taskDesc'),
+        });
         backgroundServiceRef.current = true;
         setIsBackgroundServiceRunning(true);
         console.log('Background step service started');
@@ -456,6 +516,23 @@ export const AppProvider = ({ children }) => {
         }
       }
 
+      if (healthData.isReady) {
+        try {
+          const { weightKg, heightCm } = await healthService.getBodyProfile();
+          const next = { ...bodyProfileRef.current };
+          if (weightKg != null && Number.isFinite(weightKg) && weightKg > 20 && weightKg < 400) {
+            next.weightKg = weightKg;
+            await AsyncStorage.setItem('userBodyWeightKg', String(weightKg));
+          }
+          if (heightCm != null && Number.isFinite(heightCm) && heightCm > 40 && heightCm < 260) {
+            next.heightCm = heightCm;
+            await AsyncStorage.setItem('userBodyHeightCm', String(heightCm));
+          }
+          bodyProfileRef.current = next;
+          setBodyProfile(next);
+        } catch (_) {}
+      }
+
       if (systemStepsToday <= 0) return;
 
       const prevSteps = currentStats.steps || 0;
@@ -468,9 +545,10 @@ export const AppProvider = ({ children }) => {
 
       console.log('Updating steps from system:', prevSteps, '->', systemStepsToday);
       
-      const timeHours = (currentStats.time || 0) / 60;
-      const newCalories = calculateCaloriesMET(timeHours, 75, 3.5);
-      const newDistance = calculateDistanceFromSteps(systemStepsToday);
+      const w = bodyProfileRef.current.weightKg;
+      const h = bodyProfileRef.current.heightCm;
+      const newCalories = calculateWalkingCaloriesFromSteps(systemStepsToday, w, h);
+      const newDistance = calculateDistanceFromSteps(systemStepsToday, h);
 
       const updatedStats = {
         ...currentStats,
@@ -736,20 +814,23 @@ export const AppProvider = ({ children }) => {
     if (!hasPermission) {
       console.warn('Activity permission not granted');
       Alert.alert(
-        'Нет разрешения',
-        'Для подсчёта шагов необходимо разрешение на отслеживание активности.'
+        i18n.t('permissions.noPermissionTitle'),
+        i18n.t('permissions.noPermissionMessage')
       );
       return false;
     }
 
     const isAvailable = await Pedometer.isAvailableAsync();
     console.log('Pedometer available:', isAvailable);
-    
-    if (!isAvailable) {
+
+    const healthBackedSteps =
+      healthData.isReady ||
+      (Platform.OS === 'android' && healthData.healthConnectAvailable === true);
+    if (!isAvailable && !healthBackedSteps) {
       console.warn('Pedometer is not available');
       Alert.alert(
-        'Шагомер недоступен',
-        'К сожалению, ваше устройство не поддерживает подсчёт шагов. Убедитесь, что у приложения есть разрешение "Физическая активность".'
+        i18n.t('permissions.pedometerNoDeviceTitle'),
+        i18n.t('permissions.pedometerNoDeviceMessage')
       );
       return false;
     }
@@ -777,9 +858,9 @@ export const AppProvider = ({ children }) => {
       setDailyStats((prev) => {
         const safePrev = prev ?? defaultDailyStats;
         const steps = baseSteps + (result?.steps ?? 0);
-        const newDistance = calculateDistanceFromSteps(steps);
-        const timeHours = (safePrev.time || 0) / 60;
-        const newCalories = calculateCaloriesMET(timeHours, userWeight, 3.5);
+        const bp = bodyProfileRef.current;
+        const newDistance = calculateDistanceFromSteps(steps, bp.heightCm);
+        const newCalories = calculateWalkingCaloriesFromSteps(steps, bp.weightKg, bp.heightCm);
 
         const newStats = {
           ...safePrev,
@@ -810,8 +891,9 @@ export const AppProvider = ({ children }) => {
 
       setDailyStats((prev) => {
         const safePrev = prev ?? defaultDailyStats;
-        const newCalories = calculateCaloriesMET(timeHours, userWeight, 3.5);
-        const newDistance = calculateDistanceFromSteps(safePrev.steps);
+        const bp = bodyProfileRef.current;
+        const newCalories = calculateWalkingCaloriesFromSteps(safePrev.steps, bp.weightKg, bp.heightCm);
+        const newDistance = calculateDistanceFromSteps(safePrev.steps, bp.heightCm);
 
         const newStats = {
           ...safePrev,
@@ -1006,7 +1088,11 @@ export const AppProvider = ({ children }) => {
   // 1) HC not installed → install screen
   // 2) HC installed but no permission → onboarding "Подключить шаги"
   // 3) else → main app
-  const showStepsOnboarding = Platform.OS === 'android' && healthData.healthConnectAvailable === true && !healthData.isReady;
+  const showStepsOnboarding =
+    healthData.isAvailable &&
+    healthData.healthConnectAvailable === true &&
+    !healthData.isReady &&
+    (Platform.OS === 'android' || Platform.OS === 'ios');
 
   return (
     <AppContext.Provider value={value}>

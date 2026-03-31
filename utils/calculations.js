@@ -20,14 +20,24 @@ export const calculateHaversineDistance = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+/** Stride length from height (m); ~0.414 × height is a common approximation. */
+export const strideMetersFromHeightCm = (heightCm) => {
+  if (heightCm == null || heightCm <= 0 || !Number.isFinite(heightCm)) return 0.762;
+  return (heightCm / 100) * 0.414;
+};
+
 /**
  * Calculate distance from steps
  * @param {number} steps - Number of steps
+ * @param {number|null} heightCm - Optional height for stride estimate (0.414 × height)
  * @returns {number} Distance in kilometers
  */
-export const calculateDistanceFromSteps = (steps) => {
-  // Average step length: 0.762 meters (30 inches)
-  return (steps * 0.762) / 1000; // Convert to km
+export const calculateDistanceFromSteps = (steps, heightCm = null) => {
+  const strideM =
+    heightCm != null && heightCm > 0 && Number.isFinite(heightCm)
+      ? strideMetersFromHeightCm(heightCm)
+      : 0.762;
+  return (steps * strideM) / 1000;
 };
 
 /**
@@ -40,6 +50,22 @@ export const calculateDistanceFromSteps = (steps) => {
 export const calculateCaloriesMET = (timeHours, weightKg = 75, met = 3.5) => {
   // MET formula: Calories = MET × Weight (kg) × Time (hours)
   return Math.round(met * weightKg * timeHours);
+};
+
+/**
+ * Estimate active kcal from steps using weight, optional height (better stride), and walking MET.
+ * Assumes ~5 km/h walking pace to turn distance into time for MET = 3.5.
+ */
+export const calculateWalkingCaloriesFromSteps = (steps, weightKg = 75, heightCm = null) => {
+  const w = weightKg > 0 && Number.isFinite(weightKg) ? weightKg : 75;
+  const stride =
+    heightCm != null && heightCm > 0 && Number.isFinite(heightCm)
+      ? strideMetersFromHeightCm(heightCm)
+      : 0.762;
+  const distanceKm = (steps * stride) / 1000;
+  const walkingSpeedKmh = 5;
+  const timeHours = distanceKm > 0 ? distanceKm / walkingSpeedKmh : 0;
+  return Math.max(0, Math.round(calculateCaloriesMET(timeHours, w, 3.5)));
 };
 
 /**

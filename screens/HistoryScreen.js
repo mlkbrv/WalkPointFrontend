@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { Clock, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Pressable,
   ScrollView,
@@ -11,7 +12,9 @@ import {
 import { useApp } from '../context/AppContext';
 
 function HistoryScreen() {
+  const { t, i18n } = useTranslation();
   const { trackingHistory } = useApp();
+  const localeTag = i18n.language === 'ru' ? 'ru-RU' : 'en-US';
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -20,11 +23,11 @@ function HistoryScreen() {
     yesterday.setDate(yesterday.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+      return t('history.today');
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+      return t('history.yesterday');
     } else {
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString(localeTag, {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -56,7 +59,7 @@ function HistoryScreen() {
           <View style={styles.logoContainer}>
             <Footprints size={24} color="#8140F3" />
           </View>
-          <Text style={styles.headerTitle}>History</Text>
+          <Text style={styles.headerTitle}>{t('history.title')}</Text>
           <Pressable style={styles.menuButton}>
             <MoreVertical size={20} color="#000000" />
           </Pressable>
@@ -65,10 +68,8 @@ function HistoryScreen() {
         {/* History List */}
         {Object.keys(groupedHistory).length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No tracking history yet</Text>
-            <Text style={styles.emptySubtext}>
-              Start tracking your activities to see them here
-            </Text>
+            <Text style={styles.emptyText}>{t('history.empty')}</Text>
+            <Text style={styles.emptySubtext}>{t('history.emptySub')}</Text>
           </View>
         ) : (
           Object.entries(groupedHistory).map(([dateKey, items]) => (
@@ -84,26 +85,26 @@ function HistoryScreen() {
                       <Text style={styles.historyValue}>
                         {item.steps.toLocaleString()}
                       </Text>
-                      <Text style={styles.historyLabel}>steps</Text>
+                      <Text style={styles.historyLabel}>{t('history.steps')}</Text>
                     </View>
                     <View style={styles.historyStat}>
                       <Clock size={28} color="#FF9800" strokeWidth={2} />
                       <Text style={styles.historyValue}>
                         {Math.floor(item.time / 60)}h {item.time % 60}m
                       </Text>
-                      <Text style={styles.historyLabel}>time</Text>
+                      <Text style={styles.historyLabel}>{t('history.time')}</Text>
                     </View>
                     <View style={styles.historyStat}>
                       <Flame size={28} color="#F44336" strokeWidth={2} />
                       <Text style={styles.historyValue}>{item.calories}</Text>
-                      <Text style={styles.historyLabel}>kcal</Text>
+                      <Text style={styles.historyLabel}>{t('history.kcal')}</Text>
                     </View>
                     <View style={styles.historyStat}>
                       <MapPin size={28} color="#4CAF50" strokeWidth={2} />
                       <Text style={styles.historyValue}>
                         {item.distance.toFixed(2)}
                       </Text>
-                      <Text style={styles.historyLabel}>km</Text>
+                      <Text style={styles.historyLabel}>{t('history.km')}</Text>
                     </View>
                   </View>
                 </View>

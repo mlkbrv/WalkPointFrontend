@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { getMyCoupons } from '../services/apiService';
 
 const BRAND_COLORS = {
@@ -38,6 +39,7 @@ const getBrandColor = (partnerName) => {
 };
 
 export default function MyCouponsScreen({ navigation }) {
+  const { t, i18n } = useTranslation();
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -63,7 +65,8 @@ export default function MyCouponsScreen({ navigation }) {
 
   const formatDate = (d) => {
     if (!d) return '';
-    return new Date(d).toLocaleDateString('en-GB', {
+    const locale = i18n.language === 'ru' ? 'ru-RU' : 'en-GB';
+    return new Date(d).toLocaleDateString(locale, {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
@@ -86,7 +89,7 @@ export default function MyCouponsScreen({ navigation }) {
 
   const renderCoupon = ({ item }) => {
     const brandColor = getBrandColor(item.partner_name);
-    const offerText = item.template_title || item.title || 'Offer';
+    const offerText = item.template_title || item.title || t('market.offerFallback');
     const validUntil = item.valid_until || item.expires_at || item.created_at;
 
     return (
@@ -102,8 +105,10 @@ export default function MyCouponsScreen({ navigation }) {
             <View style={styles.dashedEdge} />
             <View style={styles.couponRight}>
               <Text style={styles.couponOffer}>{offerText}</Text>
-              <Text style={styles.couponPartner}>{item.partner_name || 'Partner'}</Text>
-              <Text style={styles.couponValid}>Valid until {formatDate(validUntil)}</Text>
+              <Text style={styles.couponPartner}>{item.partner_name || t('common.partner')}</Text>
+              <Text style={styles.couponValid}>
+                {t('myCoupons.validUntil', { date: formatDate(validUntil) })}
+              </Text>
             </View>
           </View>
         </View>
@@ -125,7 +130,7 @@ export default function MyCouponsScreen({ navigation }) {
         >
           <ArrowLeft size={24} color="#FFF" />
         </Pressable>
-        <Text style={styles.headerTitle}>My Coupons</Text>
+        <Text style={styles.headerTitle}>{t('myCoupons.title')}</Text>
         <Pressable style={styles.headerBtn}>
           <Menu size={24} color="#FFF" />
         </Pressable>
@@ -139,10 +144,8 @@ export default function MyCouponsScreen({ navigation }) {
         ) : coupons.length === 0 ? (
           <View style={styles.centered}>
             <Text style={styles.emptyEmoji}>🎟️</Text>
-            <Text style={styles.emptyTitle}>No Coupons Yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Tap "Buy new coupon" below to get coupons from the store.
-            </Text>
+            <Text style={styles.emptyTitle}>{t('myCoupons.emptyTitle')}</Text>
+            <Text style={styles.emptySubtitle}>{t('myCoupons.emptySubtitle')}</Text>
           </View>
         ) : (
           <FlatList
@@ -158,7 +161,7 @@ export default function MyCouponsScreen({ navigation }) {
           style={({ pressed }) => [styles.buyNewBtn, pressed && styles.buyNewBtnPressed]}
           onPress={() => navigation.navigate('CouponStore')}
         >
-          <Text style={styles.buyNewBtnText}>Buy new coupon</Text>
+          <Text style={styles.buyNewBtnText}>{t('myCoupons.buyNew')}</Text>
         </Pressable>
       </View>
     </View>

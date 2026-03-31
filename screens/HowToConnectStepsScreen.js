@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft, Footprints } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Platform,
   Pressable,
@@ -10,26 +10,20 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const STEPS_ANDROID = [
-  { n: 1, text: 'Откройте Health Connect (устанавливается из Google Play, если ещё нет).' },
-  { n: 2, text: 'В приложении WalkPoint нажмите «Подключить шаги» и выберите WalkPoint в списке приложений.' },
-  { n: 3, text: 'Включите доступ к «Шаги» для WalkPoint.' },
-  { n: 4, text: 'Если пользуетесь Samsung Health: откройте Samsung Health → Настройки → Health Connect → включите обмен данными «Шаги».' },
-  { n: 5, text: 'Готово. Шаги будут синхронизироваться автоматически.' },
-];
-
-const STEPS_IOS = [
-  { n: 1, text: 'Откройте «Здоровье» (Health) на iPhone.' },
-  { n: 2, text: 'Нажмите «Обзор» → «Активность» → «Шаги».' },
-  { n: 3, text: 'Нажмите «Показать все данные» и включите доступ для WalkPoint.' },
-  { n: 4, text: 'Разрешите чтение данных о шагах при запросе от приложения.' },
-  { n: 5, text: 'Готово. Шаги будут синхронизироваться автоматически.' },
-];
+import { useTranslation } from 'react-i18next';
 
 export default function HowToConnectStepsScreen({ navigation }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const steps = Platform.OS === 'android' ? STEPS_ANDROID : STEPS_IOS;
+
+  const steps = useMemo(() => {
+    const raw =
+      Platform.OS === 'android'
+        ? t('howTo.androidSteps', { returnObjects: true })
+        : t('howTo.iosSteps', { returnObjects: true });
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map((text, i) => ({ n: i + 1, text }));
+  }, [t]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -38,7 +32,7 @@ export default function HowToConnectStepsScreen({ navigation }) {
         <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
           <ChevronLeft size={24} color="#000000" strokeWidth={2} />
         </Pressable>
-        <Text style={styles.headerTitle}>Как подключить шаги</Text>
+        <Text style={styles.headerTitle}>{t('howTo.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -46,9 +40,7 @@ export default function HowToConnectStepsScreen({ navigation }) {
           <Footprints size={48} color="#8140F3" strokeWidth={2} />
         </View>
         <Text style={styles.subtitle}>
-          {Platform.OS === 'android'
-            ? 'WalkPoint использует Health Connect для получения данных о шагах на Android.'
-            : 'WalkPoint использует Apple Health для получения данных о шагах на iPhone.'}
+          {Platform.OS === 'android' ? t('howTo.subtitleAndroid') : t('howTo.subtitleIos')}
         </Text>
         <View style={styles.stepsList}>
           {steps.map((s) => (
@@ -60,9 +52,9 @@ export default function HowToConnectStepsScreen({ navigation }) {
             </View>
           ))}
         </View>
-        <Text style={styles.footer}>
-          Если шаги не приходят — убедитесь, что приложение‑источник (Samsung Health, Google Fit и др.) передаёт данные в Health Connect.
-        </Text>
+        {Platform.OS === 'android' ? (
+          <Text style={styles.footer}>{t('howTo.footerAndroid')}</Text>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -100,59 +92,53 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
   iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#EDE7F6',
-    justifyContent: 'center',
-    alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 24,
+    marginTop: 24,
+    marginBottom: 16,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 22,
     color: '#555',
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   stepsList: {
-    marginBottom: 24,
+    gap: 14,
   },
   stepRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    gap: 12,
   },
   stepNumber: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#8140F3',
+    backgroundColor: '#EDE7F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
-    marginTop: 2,
   },
   stepNumberText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#5E35B1',
   },
   stepText: {
     flex: 1,
     fontSize: 15,
-    color: '#333',
     lineHeight: 22,
+    color: '#333',
   },
   footer: {
+    marginTop: 28,
     fontSize: 13,
-    color: '#888',
     lineHeight: 20,
-    fontStyle: 'italic',
+    color: '#888',
+    textAlign: 'center',
   },
 });

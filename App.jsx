@@ -1,3 +1,4 @@
+import './i18n/config';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -7,6 +8,7 @@ try {
 } catch (_) {}
 import { BarChart3, Home, MapPin, ShoppingBag, Trophy, User } from 'lucide-react-native';
 import React, { Component, lazy, Suspense, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useApp } from './context/AppContext';
 import { ActivityIndicator, AppRegistry, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +16,7 @@ import { enableScreens } from 'react-native-screens';
 
 import { AppProvider } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import i18n, { loadStoredLanguage } from './i18n/config';
 
 enableScreens(true);
 
@@ -78,6 +81,7 @@ function AccountStackNav() {
 }
 
 function MainTabs() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { startStepTracking } = useApp();
   const tabBarHeight = 70;
@@ -124,6 +128,7 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
+          tabBarLabel: t('tabs.home'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               <Home size={22} color={focused ? '#8140F3' : '#999999'} strokeWidth={focused ? 2.5 : 2} />
@@ -137,6 +142,7 @@ function MainTabs() {
         component={TrackScreen}
         options={{
           lazy: true,
+          tabBarLabel: t('tabs.track'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               <MapPin size={22} color={focused ? '#8140F3' : '#999999'} strokeWidth={focused ? 2.5 : 2} />
@@ -149,6 +155,7 @@ function MainTabs() {
         name="Market"
         component={MarketStackNav}
         options={{
+          tabBarLabel: t('tabs.market'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               <ShoppingBag size={22} color={focused ? '#8140F3' : '#999999'} strokeWidth={focused ? 2.5 : 2} />
@@ -161,6 +168,7 @@ function MainTabs() {
         name="Report"
         component={ReportStackNav}
         options={{
+          tabBarLabel: t('tabs.report'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               <BarChart3 size={22} color={focused ? '#8140F3' : '#999999'} strokeWidth={focused ? 2.5 : 2} />
@@ -173,6 +181,7 @@ function MainTabs() {
         name="Scoreboard"
         component={ScoreboardScreen}
         options={{
+          tabBarLabel: t('tabs.scoreboard'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               <Trophy size={22} color={focused ? '#8140F3' : '#999999'} strokeWidth={focused ? 2.5 : 2} />
@@ -185,6 +194,7 @@ function MainTabs() {
         name="Account"
         component={AccountStackNav}
         options={{
+          tabBarLabel: t('tabs.account'),
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
               <User size={22} color={focused ? '#8140F3' : '#999999'} strokeWidth={focused ? 2.5 : 2} />
@@ -231,7 +241,7 @@ class AppErrorBoundary extends Component {
       return (
         <View style={[styles.loadingContainer, { padding: 24 }]}>
           <Text style={{ fontSize: 16, color: '#333', textAlign: 'center' }}>
-            Произошла ошибка. Перезапустите приложение.
+            {i18n.t('appError.title')}
           </Text>
           <Text style={{ fontSize: 12, color: '#666', marginTop: 12 }} selectable>
             {this.state.error?.message || String(this.state.error)}
@@ -244,6 +254,10 @@ class AppErrorBoundary extends Component {
 }
 
 function App() {
+  useEffect(() => {
+    loadStoredLanguage();
+  }, []);
+
   useEffect(() => {
     if (Platform.OS === 'android' && NavigationBar.setPositionAsync) {
       NavigationBar.setPositionAsync('absolute').catch(() => {});

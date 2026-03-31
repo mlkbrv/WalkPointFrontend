@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { AlertCircle, Clock, Coins, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +19,7 @@ import Svg, { Circle, Line } from 'react-native-svg';
 import { useApp } from '../context/AppContext';
 import { getStories, viewStory } from '../services/apiService';
 import { clearGoogleFitDeniedCooldown } from '../services/googleFitSteps';
+import i18nInstance from '../i18n/config';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ const GOOGLE_FIT_PACKAGE = 'com.google.android.apps.fitness';
 const GOOGLE_FIT_PLAY_URL = `https://play.google.com/store/apps/details?id=${GOOGLE_FIT_PACKAGE}`;
 
 function HomeScreen() {
+  const { t } = useTranslation();
   const {
     dailyStats,
     weeklyProgress,
@@ -43,7 +46,11 @@ function HomeScreen() {
   const isSamsungDevice =
     Platform.OS === 'android' &&
     DeviceInfo.getManufacturerSync().toLowerCase() === 'samsung';
-  const showHealthConnectBanner = Platform.OS === 'android' && useHealthConnect && healthConnectAvailable === true && !healthConnectReady;
+  const showHealthConnectBanner =
+    (Platform.OS === 'android' || Platform.OS === 'ios') &&
+    useHealthConnect &&
+    healthConnectAvailable === true &&
+    !healthConnectReady;
   const showStepsNotShowing =
     Platform.OS === 'android' &&
     useHealthConnect &&
@@ -74,13 +81,14 @@ function HomeScreen() {
 
   useEffect(() => {
     if (weeklyProgress.length === 0) {
+      const localeTag = i18nInstance.language === 'ru' ? 'ru-RU' : 'en-US';
       const today = new Date();
       const week = [];
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         week.push({
-          day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          day: date.toLocaleDateString(localeTag, { weekday: 'short' }),
           date: date.getDate(),
           steps: i === 0 ? safeDailyStats.steps : 0,
         });
@@ -102,19 +110,22 @@ function HomeScreen() {
 
   const handleStoryPress = async (story) => {
     if (story.is_viewed) {
-      Alert.alert('Already Viewed', 'You already earned coins for this story.');
+      Alert.alert(t('home.storyViewedTitle'), t('home.storyViewedMessage'));
       return;
     }
     try {
       const result = await viewStory(story.id);
       Alert.alert(
-        'Coins Earned!',
-        `You earned ${result.reward_earned} coins.\nNew balance: ${result.new_balance}`,
+        t('home.coinsEarnedTitle'),
+        t('home.coinsEarnedMessage', {
+          amount: result.reward_earned,
+          balance: result.new_balance,
+        }),
       );
       refreshWallet();
       fetchStories();
     } catch (e) {
-      Alert.alert('Info', e.message);
+      Alert.alert(t('common.info'), e.message);
     }
   };
 
@@ -123,7 +134,7 @@ function HomeScreen() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercentage / 100) * circumference;
 
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const weekDays = useMemo(() => t('home.weekdays', { returnObjects: true }), [t]);
   const today = new Date();
   const currentDay = today.getDay();
   const adjustedDay = currentDay === 0 ? 6 : currentDay - 1;
@@ -148,9 +159,9 @@ function HomeScreen() {
             onPress={() => requestHealthConnectPermission?.()}
           >
             <Text style={styles.healthConnectBannerText}>
-              Подключите Health Connect для синхронизации шагов
+              {Platform.OS === 'ios' ? t('home.connectHealthBanner') : t('home.connectHcBanner')}
             </Text>
-            <Text style={styles.healthConnectBannerButton}>Подключить</Text>
+            <Text style={styles.healthConnectBannerButton}>{t('home.connect')}</Text>
           </Pressable>
         )}
         {/* Header */}
@@ -158,7 +169,7 @@ function HomeScreen() {
           <View style={styles.logoContainer}>
             <Footprints size={24} color="#8140F3" />
           </View>
-          <Text style={styles.headerTitle}>Home</Text>
+          <Text style={styles.headerTitle}>{t('tabs.home')}</Text>
           <View style={styles.balanceBadge}>
             <Coins size={14} color="#8140F3" />
             <Text style={styles.balanceText}>{parseFloat(walletBalance).toFixed(0)}</Text>
@@ -197,7 +208,7 @@ function HomeScreen() {
                     </View>
                   </View>
                   <Text style={styles.storyName} numberOfLines={1}>
-                    {story.partner_name || 'Partner'}
+                    {story.partner_name || t('common.partner')}
                   </Text>
                   {!story.is_viewed && (
                     <Text style={styles.storyReward}>+{story.reward_amount}</Text>
@@ -206,7 +217,7 @@ function HomeScreen() {
               );
             })
           ) : (
-            <Text style={styles.noStories}>No stories available</Text>
+            <Text style={styles.noStories}>{t('home.noStories')}</Text>
           )}
         </ScrollView>
 
@@ -255,7 +266,7 @@ function HomeScreen() {
             </Svg>
             <View style={styles.innerCircle}>
               <Text style={styles.stepNumber}>{safeDailyStats.steps}</Text>
-              <Text style={styles.stepLabel}>Steps</Text>
+              <Text style={styles.stepLabel}>{t('home.steps')}</Text>
               <Text style={styles.goalText}>{goal.toLocaleString()}</Text>
             </View>
           </View>
@@ -264,13 +275,13 @@ function HomeScreen() {
         {showStepsNotShowing && (
           <View style={styles.stepsNotShowingCard}>
             <AlertCircle size={20} color="#F59E0B" strokeWidth={2} style={styles.stepsNotShowingIcon} />
-            <Text style={styles.stepsNotShowingTitle}>Шаги не показываются</Text>
+            <Text style={styles.stepsNotShowingTitle}>{t('home.stepsNotShowingTitle')}</Text>
             <Text style={styles.stepsNotShowingText}>
               {healthConnectAvailable === false
-                ? 'На этом устройстве Health Connect недоступен. Убедитесь, что в Google Fit за сегодня есть шаги и вы вошли в тот же аккаунт Google.'
+                ? t('home.stepsNotShowingHcOff')
                 : isSamsungDevice
-                  ? 'Проверьте, что источники шагов (Samsung Health и др.) подключены к Health Connect и синхронизируют данные.'
-                  : 'Проверьте Health Connect и Google Fit: шаги должны попадать хотя бы в один из источников.'}
+                  ? t('home.stepsNotShowingSamsung')
+                  : t('home.stepsNotShowingDefault')}
             </Text>
             <View style={styles.stepsNotShowingButtons}>
               {healthConnectAvailable === true && (
@@ -278,7 +289,7 @@ function HomeScreen() {
                   style={styles.stepsNotShowingBtn}
                   onPress={() => openHealthConnectSettings?.()}
                 >
-                  <Text style={styles.stepsNotShowingBtnText}>Открыть Health Connect</Text>
+                  <Text style={styles.stepsNotShowingBtnText}>{t('home.openHc')}</Text>
                 </Pressable>
               )}
               {isSamsungDevice ? (
@@ -286,14 +297,14 @@ function HomeScreen() {
                   style={[styles.stepsNotShowingBtn, styles.stepsNotShowingBtnSecondary]}
                   onPress={() => openSamsungHealth?.()}
                 >
-                  <Text style={styles.stepsNotShowingBtnTextSecondary}>Открыть Samsung Health</Text>
+                  <Text style={styles.stepsNotShowingBtnTextSecondary}>{t('home.openSamsungHealth')}</Text>
                 </Pressable>
               ) : (
                 <Pressable
                   style={[styles.stepsNotShowingBtn, styles.stepsNotShowingBtnSecondary]}
                   onPress={openGoogleFit}
                 >
-                  <Text style={styles.stepsNotShowingBtnTextSecondary}>Открыть Google Fit</Text>
+                  <Text style={styles.stepsNotShowingBtnTextSecondary}>{t('home.openGoogleFit')}</Text>
                 </Pressable>
               )}
             </View>
@@ -306,26 +317,26 @@ function HomeScreen() {
             <Text style={styles.metricValue}>
               {Math.floor(safeDailyStats.time / 60)}h {safeDailyStats.time % 60}m
             </Text>
-            <Text style={styles.metricLabel}>time</Text>
+            <Text style={styles.metricLabel}>{t('home.time')}</Text>
           </View>
           <View style={styles.metricItem}>
             <Flame size={32} color="#F44336" strokeWidth={2} />
             <Text style={styles.metricValue}>{safeDailyStats.calories}</Text>
-            <Text style={styles.metricLabel}>kcal</Text>
+            <Text style={styles.metricLabel}>{t('home.kcal')}</Text>
           </View>
           <View style={styles.metricItem}>
             <MapPin size={32} color="#4CAF50" strokeWidth={2} />
             <Text style={styles.metricValue}>{safeDailyStats.distance.toFixed(2)}</Text>
-            <Text style={styles.metricLabel}>km</Text>
+            <Text style={styles.metricLabel}>{t('home.km')}</Text>
           </View>
         </View>
 
         {/* Weekly Progress */}
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>Your Progress</Text>
+            <Text style={styles.progressTitle}>{t('home.yourProgress')}</Text>
             <Pressable style={styles.weekSelector}>
-              <Text style={styles.weekSelectorText}>This Week</Text>
+              <Text style={styles.weekSelectorText}>{t('home.thisWeek')}</Text>
               <Text style={styles.weekSelectorArrow}>▼</Text>
             </Pressable>
           </View>

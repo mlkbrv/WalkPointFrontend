@@ -10,9 +10,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen({ navigation }) {
+  const { t } = useTranslation();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +23,7 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError('Please fill in all fields.');
+      setError(t('auth.fillAllFields'));
       return;
     }
     setError('');
@@ -30,7 +32,7 @@ export default function LoginScreen({ navigation }) {
       await login(email.trim().toLowerCase(), password);
     } catch (e) {
       console.error('Login failed', e);
-      setError(e.message || 'Login failed');
+      setError(e.message || t('auth.loginFailed'));
     } finally {
       setLoading(false);
     }
@@ -47,7 +49,7 @@ export default function LoginScreen({ navigation }) {
             <Footprints size={40} color="#FFFFFF" />
           </View>
           <Text style={styles.appName}>WalkPoint</Text>
-          <Text style={styles.tagline}>Walk. Earn. Enjoy.</Text>
+          <Text style={styles.tagline}>{t('auth.tagline')}</Text>
         </View>
 
         <View style={styles.form}>
@@ -55,7 +57,7 @@ export default function LoginScreen({ navigation }) {
 
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder={t('auth.email')}
             placeholderTextColor="#999"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -64,7 +66,7 @@ export default function LoginScreen({ navigation }) {
           />
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder={t('auth.password')}
             placeholderTextColor="#999"
             secureTextEntry
             value={password}
@@ -79,13 +81,14 @@ export default function LoginScreen({ navigation }) {
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.buttonText}>Log In</Text>
+              <Text style={styles.buttonText}>{t('auth.logIn')}</Text>
             )}
           </Pressable>
 
           <Pressable onPress={() => navigation.navigate('Register')}>
             <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkBold}>Sign Up</Text>
+              {t('auth.signUpLink')}{' '}
+              <Text style={styles.linkBold}>{t('auth.signUpBold')}</Text>
             </Text>
           </Pressable>
         </View>

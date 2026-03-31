@@ -1,0 +1,243 @@
+{
+  "common": {
+    "cancel": "Отмена",
+    "settings": "Настройки",
+    "ok": "OK",
+    "info": "Информация",
+    "error": "Ошибка",
+    "success": "Готово",
+    "save": "Сохранить",
+    "share": "Поделиться",
+    "back": "Назад",
+    "get": "Получить",
+    "partner": "Партнёр",
+    "retry": "Повторить",
+    "notAvailable": "—"
+  },
+  "tabs": {
+    "home": "Главная",
+    "track": "Маршрут",
+    "market": "Магазин",
+    "report": "Отчёт",
+    "scoreboard": "Рейтинг",
+    "account": "Профиль"
+  },
+  "auth": {
+    "tagline": "Ходи. Зарабатывай. Наслаждайся.",
+    "email": "Email",
+    "password": "Пароль",
+    "logIn": "Войти",
+    "signUpLink": "Нет аккаунта?",
+    "signUpBold": "Регистрация",
+    "fillAllFields": "Заполните все поля.",
+    "loginFailed": "Не удалось войти",
+    "createAccount": "Создать аккаунт",
+    "firstNameRequired": "Имя *",
+    "lastName": "Фамилия",
+    "emailRequired": "Email *",
+    "passwordHint": "Пароль * (мин. 8 символов)",
+    "signUp": "Зарегистрироваться",
+    "haveAccount": "Уже есть аккаунт?",
+    "logInBold": "Войти",
+    "fillRequired": "Заполните обязательные поля.",
+    "passwordMin": "Пароль не короче 8 символов.",
+    "registrationFailed": "Регистрация не удалась"
+  },
+  "appError": {
+    "title": "Произошла ошибка. Перезапустите приложение.",
+    "unknown": "Неизвестная ошибка"
+  },
+  "background": {
+    "taskTitle": "Подсчёт шагов",
+    "taskDesc": "WalkPoint считает ваши шаги в фоновом режиме"
+  },
+  "permissions": {
+    "activityTitle": "Отслеживание активности",
+    "activityMessage": "WalkPoint нужен доступ к датчику шагов для подсчёта и наград. Шаги считаются даже при выключенном экране.",
+    "askLater": "Спросить позже",
+    "allow": "Разрешить",
+    "activityDeniedTitle": "Разрешение отклонено",
+    "activityDeniedMessage": "Для шагов нужно разрешение на активность. Включите его в настройках приложения.",
+    "pedometerUnavailableTitle": "Шагомер недоступен",
+    "pedometerUnavailableMessage": "Разрешите доступ к данным о движении в настройках устройства.",
+    "noPermissionTitle": "Нет разрешения",
+    "noPermissionMessage": "Для подсчёта шагов нужно разрешение на активность.",
+    "pedometerNoDeviceTitle": "Шагомер недоступен",
+    "pedometerNoDeviceMessage": "Устройство не поддерживает шаги. Дайте разрешение «Физическая активность» или подключите Health Connect / Apple Health."
+  },
+  "healthAlerts": {
+    "iosDeniedTitle": "Нет доступа к «Здоровье»",
+    "iosDeniedMessage": "Разрешите WalkPoint читать шаги, вес и рост в настройках приложения «Здоровье».",
+    "hcDeniedTitle": "Разрешения не предоставлены",
+    "hcDeniedMessage": "На экране разрешений выберите WalkPoint и включите «Шаги» (и при необходимости вес и рост). Приложение появится в Health Connect.",
+    "hcSettings": "Настройки Health Connect"
+  },
+  "home": {
+    "connectHcBanner": "Подключите Health Connect для синхронизации шагов",
+    "connectHealthBanner": "Подключите Apple Health для шагов и точного расчёта калорий",
+    "connect": "Подключить",
+    "stepsNotShowingTitle": "Шаги не показываются",
+    "stepsNotShowingHcOff": "На этом устройстве Health Connect недоступен. Убедитесь, что в Google Fit за сегодня есть шаги и вы вошли в тот же аккаунт Google.",
+    "stepsNotShowingSamsung": "Проверьте, что источники шагов (Samsung Health и др.) подключены к Health Connect и синхронизируют данные.",
+    "stepsNotShowingDefault": "Проверьте Health Connect и Google Fit: шаги должны попадать хотя бы в один из источников.",
+    "openHc": "Открыть Health Connect",
+    "openSamsungHealth": "Открыть Samsung Health",
+    "openGoogleFit": "Открыть Google Fit",
+    "storyViewedTitle": "Уже просмотрено",
+    "storyViewedMessage": "Вы уже получили монеты за эту историю.",
+    "coinsEarnedTitle": "Монеты начислены!",
+    "coinsEarnedMessage": "Вы получили {{amount}} монет.\nНовый баланс: {{balance}}",
+    "noStories": "Нет доступных историй",
+    "steps": "Шаги",
+    "time": "время",
+    "kcal": "ккал",
+    "km": "км",
+    "yourProgress": "Ваш прогресс",
+    "thisWeek": "Эта неделя",
+    "weekdays": ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+  },
+  "onboarding": {
+    "titleIos": "Подключите Apple Health",
+    "titleAndroid": "Подключите шаги",
+    "subtitleIos": "WalkPoint читает шаги, вес и рост из приложения «Здоровье», чтобы точнее считать калории за день.\n\nНажмите «Разрешить доступ» — в системном окне включите шаги, вес и рост для WalkPoint.",
+    "subtitleAndroid": "WalkPoint получает данные о шагах, весе и росте из Health Connect.\n\nСначала откройте Health Connect (кнопка ниже), затем нажмите «Подключить шаги» — в окне выберите WalkPoint и разрешите доступ к шагам (и при необходимости к весу и росту).",
+    "openHc": "Открыть Health Connect",
+    "connectSteps": "Подключить шаги",
+    "allowAccess": "Разрешить доступ",
+    "hintIos": "Если окно не появилось: Настройки → Конфиденциальность → Здоровье → Доступ к данным → WalkPoint.",
+    "hintAndroid": "Если WalkPoint не появляется в списке: полностью закройте приложение Health Connect (смахните из недавних) и откройте снова, затем снова нажмите «Подключить шаги».",
+    "hintSamsung": "Samsung Health: подключите его к Health Connect в настройках Samsung Health.",
+    "healthConnectRequiredTitle": "Health Connect",
+    "healthConnectRequiredMessage": "Для синхронизации шагов нужен Health Connect.\n\nУстановите его из Google Play.",
+    "install": "Установить",
+    "checkAgain": "Проверить снова"
+  },
+  "howTo": {
+    "title": "Как подключить шаги",
+    "subtitleAndroid": "WalkPoint использует Health Connect для получения данных о шагах на Android.",
+    "subtitleIos": "WalkPoint использует Apple Health для получения данных о шагах на iPhone.",
+    "footerAndroid": "Если шаги не приходят — убедитесь, что приложение-источник (Samsung Health, Google Fit и др.) передаёт данные в Health Connect.",
+    "androidSteps": [
+      "Откройте Health Connect (устанавливается из Google Play, если ещё нет).",
+      "В приложении WalkPoint нажмите «Подключить шаги» и выберите WalkPoint в списке приложений.",
+      "Включите доступ к «Шаги», при возможности — к весу и росту (точнее калории).",
+      "Если пользуетесь Samsung Health: Samsung Health → Настройки → Health Connect → включите обмен данными «Шаги».",
+      "Готово. Шаги будут синхронизироваться автоматически."
+    ],
+    "iosSteps": [
+      "В WalkPoint нажмите «Разрешить доступ» и в системном окне включите шаги, вес и рост.",
+      "Либо: Настройки → Конфиденциальность → Здоровье → Доступ к данным → WalkPoint.",
+      "Включите «Шаги», «Масса тела» и «Рост» для WalkPoint — так калории считаются точнее.",
+      "Данные о весе и росте можно добавить вручную в приложении «Здоровье», если их ещё нет.",
+      "Готово. Шаги и параметры тела подтянутся из Apple Health."
+    ]
+  },
+  "track": {
+    "locationDeniedTitle": "Нет разрешения",
+    "locationDeniedMessage": "Для трека маршрута нужен доступ к геолокации.",
+    "gettingLocation": "Определяем местоположение...",
+    "steps": "шаги",
+    "startRoute": "Начать маршрут",
+    "stopRoute": "Остановить маршрут"
+  },
+  "account": {
+    "title": "Профиль",
+    "userFallback": "Пользователь",
+    "coins": "Монеты",
+    "totalSteps": "Всего шагов",
+    "totalTime": "Всего времени",
+    "convertSteps": "Обменять {{count}} шагов на монеты",
+    "howToSteps": "Как подключить шаги",
+    "settings": "Настройки",
+    "notifications": "Уведомления",
+    "privacy": "Конфиденциальность",
+    "about": "О приложении",
+    "language": "Язык",
+    "languageEnglish": "English",
+    "languageRussian": "Русский",
+    "logOut": "Выйти",
+    "noStepsTitle": "Нет шагов",
+    "noStepsMessage": "Сначала пройдите шаги, затем обменивайте их на монеты.",
+    "convertedTitle": "Шаги обменяны!",
+    "convertedMessage": "Вы получили {{coins}} монет.\nНовый баланс: {{balance}}",
+    "conversionTitle": "Обмен",
+    "conversionFailed": "Не удалось обменять шаги.",
+    "logoutTitle": "Выход",
+    "logoutMessage": "Выйти из аккаунта?"
+  },
+  "market": {
+    "title": "Магазин купонов",
+    "empty": "Пока нет доступных купонов",
+    "stepsPrice": "{{steps}} шагов",
+    "coinsShort": "{{coins}} мон",
+    "offerFallback": "Предложение"
+  },
+  "myCoupons": {
+    "title": "Мои купоны",
+    "emptyTitle": "Пока нет купонов",
+    "emptySubtitle": "Нажмите «Купить новый купон» ниже, чтобы выбрать предложение в магазине.",
+    "buyNew": "Купить новый купон",
+    "validUntil": "Действует до {{date}}"
+  },
+  "couponDetail": {
+    "title": "PIN и QR-код",
+    "savedTitle": "Сохранено",
+    "savedMessage": "Данные купона сохранены.",
+    "descFallback": "Воспользуйтесь предложением при следующем визите в {{partner}}.",
+    "term1": "• Можно использовать во всех точках {{partner}}.",
+    "term2": "• Не суммируется с другими скидками и акциями.",
+    "term3": "• Не подлежит обмену на деньги.",
+    "validUntil": "Действует до {{date}}",
+    "usageTitle": "Как использовать",
+    "usageText": "Покажите этот экран или QR-код на кассе. Сотрудник может запросить PIN или отсканировать код.",
+    "shareMessage": "{{title}} – {{partner}}\nКод: {{code}}\nДействует до: {{date}}",
+    "shareTitle": "Купон {{partner}}"
+  },
+  "couponRedeem": {
+    "insufficientTitle": "Недостаточно монет",
+    "insufficientMessage": "Нужно {{price}} монет. Ваш баланс: {{balance}}. Пройдите больше шагов!",
+    "redeemTitle": "Получить купон",
+    "redeemMessage": "Потратить {{price}} монет на этот купон?",
+    "redeem": "Получить",
+    "successTitle": "Готово",
+    "successMessage": "Купон добавлен в «Мои купоны»!",
+    "stepsInfo": "Нужно {{steps}} шагов. Продолжайте гулять!",
+    "stepsLabel": "Шаги",
+    "confirmPurchase": "Подтвердить покупку",
+    "offerFallback": "Предложение"
+  },
+  "report": {
+    "title": "Отчёт",
+    "totalStepsCaption": "Всего шагов за всё время.",
+    "statistics": "Статистика",
+    "thisWeek": "Эта неделя",
+    "yourProgress": "Ваш прогресс",
+    "thisMonth": "Этот месяц",
+    "allHistory": "Вся история",
+    "calendarWeekdays": ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"],
+    "metrics": {
+      "Steps": "Шаги",
+      "Time": "Время",
+      "Calorie": "Калории",
+      "Distance": "Дистанция"
+    }
+  },
+  "history": {
+    "title": "История",
+    "today": "Сегодня",
+    "yesterday": "Вчера",
+    "empty": "Пока нет истории",
+    "emptySub": "Начните отслеживать активность — записи появятся здесь.",
+    "steps": "шаги",
+    "time": "время",
+    "kcal": "ккал",
+    "km": "км"
+  },
+  "scoreboard": {
+    "title": "Недельный рейтинг",
+    "you": "Вы",
+    "youAre": "Вы на {{rank}} месте",
+    "above": "Выше: {{name}} ({{score}})",
+    "below": "Ниже: {{name}} ({{score}})"
+  }
+}

@@ -1,7 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { Clock, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dimensions,
   Pressable,
@@ -15,10 +16,15 @@ import { useApp } from '../context/AppContext';
 
 const { width } = Dimensions.get('window');
 
+const METRIC_KEYS = ['Steps', 'Time', 'Calorie', 'Distance'];
+
 function ReportScreen() {
+  const { t } = useTranslation();
   const { totalStats, trackingHistory, weeklyProgress } = useApp();
   const navigation = useNavigation();
   const [selectedMetric, setSelectedMetric] = useState('Steps');
+
+  const calendarWeekdays = useMemo(() => t('report.calendarWeekdays', { returnObjects: true }), [t]);
 
   // Calculate weekly stats for chart
   const weekData = weeklyProgress.length > 0 
@@ -73,7 +79,7 @@ function ReportScreen() {
           <View style={styles.logoContainer}>
             <Footprints size={24} color="#8140F3" />
           </View>
-          <Text style={styles.headerTitle}>Report</Text>
+          <Text style={styles.headerTitle}>{t('tabs.report')}</Text>
           <Pressable style={styles.menuButton}>
             <MoreVertical size={20} color="#000000" />
           </Pressable>
@@ -85,7 +91,7 @@ function ReportScreen() {
           <Text style={styles.totalStepsValue}>
             {totalStats.steps.toLocaleString()}
           </Text>
-          <Text style={styles.totalStepsLabel}>Total steps all the time.</Text>
+          <Text style={styles.totalStepsLabel}>{t('report.totalStepsCaption')}</Text>
         </View>
 
         {/* Summary Stats */}
@@ -95,7 +101,7 @@ function ReportScreen() {
             <Text style={styles.summaryValue}>
               {Math.floor(totalStats.time / 60)}h {totalStats.time % 60}m
             </Text>
-            <Text style={styles.summaryLabel}>time</Text>
+            <Text style={styles.summaryLabel}>{t('home.time')}</Text>
           </View>
           <View style={styles.summaryItem}>
             <Flame size={36} color="#F44336" strokeWidth={2} />
@@ -109,16 +115,16 @@ function ReportScreen() {
             <Text style={styles.summaryValue}>
               {totalStats.distance.toFixed(2)}
             </Text>
-            <Text style={styles.summaryLabel}>km</Text>
+            <Text style={styles.summaryLabel}>{t('home.km')}</Text>
           </View>
         </View>
 
         {/* Statistics Chart */}
         <View style={styles.chartSection}>
           <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>Statistics</Text>
+            <Text style={styles.chartTitle}>{t('report.statistics')}</Text>
             <Pressable style={styles.weekSelector}>
-              <Text style={styles.weekSelectorText}>This Week</Text>
+              <Text style={styles.weekSelectorText}>{t('report.thisWeek')}</Text>
               <Text style={styles.weekSelectorArrow}>▼</Text>
             </Pressable>
           </View>
@@ -185,7 +191,7 @@ function ReportScreen() {
 
           {/* Metric Selector */}
           <View style={styles.metricSelector}>
-            {['Steps', 'Time', 'Calorie', 'Distance'].map((metric) => (
+            {METRIC_KEYS.map((metric) => (
               <Pressable
                 key={metric}
                 style={[
@@ -200,7 +206,7 @@ function ReportScreen() {
                     selectedMetric === metric && styles.metricButtonTextActive,
                   ]}
                 >
-                  {metric}
+                  {t(`report.metrics.${metric}`)}
                 </Text>
               </Pressable>
             ))}
@@ -210,16 +216,16 @@ function ReportScreen() {
         {/* Calendar Progress */}
         <View style={styles.calendarSection}>
           <View style={styles.calendarHeader}>
-            <Text style={styles.calendarTitle}>Your Progress</Text>
+            <Text style={styles.calendarTitle}>{t('report.yourProgress')}</Text>
             <Pressable style={styles.monthSelector}>
-              <Text style={styles.monthSelectorText}>This Month</Text>
+              <Text style={styles.monthSelectorText}>{t('report.thisMonth')}</Text>
               <Text style={styles.monthSelectorArrow}>▼</Text>
             </Pressable>
           </View>
 
           {/* Calendar Grid with Circular Progress */}
           <View style={styles.calendarGrid}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            {(Array.isArray(calendarWeekdays) ? calendarWeekdays : []).map((day) => (
               <Text key={day} style={styles.calendarDayHeader}>
                 {day}
               </Text>
@@ -284,7 +290,7 @@ function ReportScreen() {
             style={styles.allHistoryButton}
             onPress={() => navigation.navigate('History')}
           >
-            <Text style={styles.allHistoryButtonText}>All History</Text>
+            <Text style={styles.allHistoryButtonText}>{t('report.allHistory')}</Text>
           </Pressable>
         </View>
       </ScrollView>

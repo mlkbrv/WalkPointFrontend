@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import React from 'react';
 import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { buyCoupon } from '../services/apiService';
 
@@ -20,18 +21,20 @@ const BRAND_COLORS = ['#E31837', '#00704A', '#FFC72C', '#8140F3', '#2196F3'];
 const getBrandColor = (name) => BRAND_COLORS[(name || '').length % BRAND_COLORS.length];
 
 export default function CouponRedeemScreen({ route, navigation }) {
+  const { t, i18n } = useTranslation();
   const { walletBalance, refreshWallet } = useApp();
   const coupon = route.params?.coupon || {};
   const stepsRequired = route.params?.stepsRequired ?? 5000;
-  const title = coupon.title || coupon.template_title || 'Offer';
-  const partner = coupon.partner_name || 'Partner';
+  const title = coupon.title || coupon.template_title || t('couponRedeem.offerFallback');
+  const partner = coupon.partner_name || t('common.partner');
   const price = parseFloat(coupon.price || 0);
   const validUntil = coupon.valid_until || coupon.expires_at;
   const brandBg = getBrandColor(partner);
 
   const formatDate = (d) => {
     if (!d) return '';
-    return new Date(d).toLocaleDateString('en-GB', {
+    const locale = i18n.language === 'ru' ? 'ru-RU' : 'en-GB';
+    return new Date(d).toLocaleDateString(locale, {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
@@ -42,34 +45,37 @@ export default function CouponRedeemScreen({ route, navigation }) {
     const balance = parseFloat(walletBalance);
     if (price > 0 && balance < price) {
       Alert.alert(
-        'Insufficient Balance',
-        `You need ${price} coins. Your balance: ${balance.toFixed(0)}. Walk more to earn coins!`,
+        t('couponRedeem.insufficientTitle'),
+        t('couponRedeem.insufficientMessage', {
+          price,
+          balance: balance.toFixed(0),
+        }),
       );
       return;
     }
     if (price > 0) {
       Alert.alert(
-        'Redeem Coupon',
-        `Spend ${price} coins to get this coupon?`,
+        t('couponRedeem.redeemTitle'),
+        t('couponRedeem.redeemMessage', { price }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Redeem',
+            text: t('couponRedeem.redeem'),
             onPress: async () => {
               try {
                 await buyCoupon(coupon.id);
                 refreshWallet();
-                Alert.alert('Success', 'Coupon added to My Coupons!');
+                Alert.alert(t('couponRedeem.successTitle'), t('couponRedeem.successMessage'));
                 navigation.navigate('MyCoupons');
               } catch (e) {
-                Alert.alert('Error', e.message);
+                Alert.alert(t('common.error'), e.message);
               }
             },
           },
         ],
       );
     } else {
-      Alert.alert('Info', `${stepsRequired} steps required. Keep walking to unlock!`);
+      Alert.alert(t('common.info'), t('couponRedeem.stepsInfo', { steps: stepsRequired }));
     }
   };
 
@@ -98,7 +104,9 @@ export default function CouponRedeemScreen({ route, navigation }) {
               <Text style={styles.offerTitle}>{title}</Text>
               <Text style={styles.offerPartner}>{partner}</Text>
               {validUntil ? (
-                <Text style={styles.validUntil}>Valid until {formatDate(validUntil)}</Text>
+                <Text style={styles.validUntil}>
+                  {t('couponDetail.validUntil', { date: formatDate(validUntil) })}
+                </Text>
               ) : null}
             </View>
           </View>
@@ -130,17 +138,17 @@ export default function CouponRedeemScreen({ route, navigation }) {
           </Svg>
           <View style={styles.stepsCenter}>
             <Text style={styles.stepsNumber}>{stepsRequired.toLocaleString()}</Text>
-            <Text style={styles.stepsLabel}>Steps</Text>
+            <Text style={styles.stepsLabel}>{t('couponRedeem.stepsLabel')}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.actions}>
         <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={styles.backButtonText}>{t('common.back')}</Text>
         </Pressable>
         <Pressable style={styles.redeemButton} onPress={handleRedeem}>
-          <Text style={styles.redeemButtonText}>Confirm Purchase</Text>
+          <Text style={styles.redeemButtonText}>{t('couponRedeem.confirmPurchase')}</Text>
         </Pressable>
       </View>
     </View>

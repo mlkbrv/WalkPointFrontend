@@ -13,3 +13,9 @@ export const getTodaySteps = () => service.getTodaySteps();
 export const getStepsInRange = (startDate, endDate) => service.getStepsInRange(startDate, endDate);
 export const openSettings = () => service.openSettings();
 export const openSamsungHealth = () => (Platform.OS === 'android' ? healthConnect.openSamsungHealth() : Promise.resolve());
+
+export const getBodyProfile = async () => {
+  if (Platform.OS === 'android') return healthConnect.getBodyProfile();
+  if (Platform.OS === 'ios') return appleHealth.getBodyProfile();
+  return { weightKg: null, heightCm: null };
+};

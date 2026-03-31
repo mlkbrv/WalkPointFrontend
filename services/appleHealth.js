@@ -1,13 +1,24 @@
 import { Platform } from 'react-native';
 
 let HealthKit = null;
+let Permissions = null;
+
 if (Platform.OS === 'ios') {
   try {
-    HealthKit = require('react-native-health');
-    if (HealthKit && HealthKit.default) HealthKit = HealthKit.default;
+    const mod = require('react-native-health');
+    HealthKit = mod.default ?? mod;
+    Permissions = HealthKit.Constants?.Permissions;
   } catch (e) {
     console.log('Apple Health not available:', e.message);
   }
+}
+
+function readPermissionsList() {
+  const P = Permissions;
+  if (!P) {
+    return ['StepCount', 'Height', 'Weight'];
+  }
+  return [P.StepCount, P.Height, P.Weight].filter(Boolean);
 }
 
 export const isAvailable = () => Platform.OS === 'ios' && HealthKit != null;
@@ -31,20 +42,21 @@ export const initialize = async () => {
     HealthKit.initHealthKit(
       {
         permissions: {
-          read: [HealthKit.Constants?.Permissions?.StepCount || 'StepCount'],
+          read: readPermissionsList(),
           write: [],
         },
       },
       (err) => {
         resolve(!err);
-      }
+      },
     );
   });
 };
 
-export const requestPermissions = async () => {
-  return initialize();
-};
+export const requestPermissions = async () => initialize();
+
+/** Android hook parity: HealthKit has no equivalent list API. */
+export const getGrantedPermissions = async () => [];
 
 export const getTodaySteps = async () => {
   if (!isAvailable()) return 0;
@@ -61,7 +73,7 @@ export const getTodaySteps = async () => {
         }
         const value = result?.value ?? result ?? 0;
         resolve(typeof value === 'number' ? value : 0);
-      }
+      },
     );
   });
 };
@@ -79,9 +91,32 @@ export const getStepsInRange = async (startDate, endDate) => {
         }
         const value = result?.value ?? result ?? 0;
         resolve(typeof value === 'number' ? value : 0);
-      }
+      },
     );
   });
+};
+
+export const getBodyProfile = async () => {
+  if (!isAvailable()) return { weightKg: null, heightCm: null };
+  const weightKg = await new Promise((resolve) => {
+    HealthKit.getLatestWeight({ unit: 'kg' }, (err, res) => {
+      if (err || res == null || typeof res.value !== 'number') {
+        resolve(null);
+        return;
+      }
+      resolve(res.value);
+    });
+  });
+  const heightCm = await new Promise((resolve) => {
+    HealthKit.getLatestHeight({ unit: 'meter' }, (err, res) => {
+      if (err || res == null || typeof res.value !== 'number') {
+        resolve(null);
+        return;
+      }
+      resolve(res.value * 100);
+    });
+  });
+  return { weightKg, heightCm };
 };
 
 export const openSettings = async () => {
