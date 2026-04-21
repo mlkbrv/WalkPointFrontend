@@ -118,25 +118,50 @@ export const updateProfile = async (data) => {
 };
 
 // ── Activity ──────────────────────────────────────────
+// Contract: optional `date` (YYYY-MM-DD, user's local calendar day), `source`,
+// `duration_sec`, `distance_m` (meters), `calories` (kcal). See backend API_GUIDE.
 
-export const convertSteps = async (steps) => {
+/** @param {number | Record<string, unknown>} payload - steps only, or full body for convert */
+export const convertSteps = async (payload) => {
+  const body = typeof payload === 'number' ? { steps: payload } : { ...payload };
   const res = await apiFetch('/activity/convert/', {
     method: 'POST',
-    body: JSON.stringify({ steps }),
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.steps?.[0] || 'Conversion failed');
   return data;
 };
 
-export const getTodayStat = async () => {
-  const res = await apiFetch('/activity/today/');
+/** Sync daily activity without coin conversion. Requires `date` + `steps` (≥ 0). */
+export const syncActivity = async (body) => {
+  const res = await apiFetch('/activity/sync/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || data.steps?.[0] || 'Activity sync failed');
+  return data;
+};
+
+/** @param {string} [date] - YYYY-MM-DD local calendar day (recommended for mobile) */
+export const getTodayStat = async (date) => {
+  const params = new URLSearchParams();
+  if (date) params.set('date', date);
+  const qs = params.toString();
+  const res = await apiFetch(`/activity/today/${qs ? `?${qs}` : ''}`);
   if (!res.ok) throw new Error('Failed to load today stat');
   return res.json();
 };
 
-export const getStats = async () => {
-  const res = await apiFetch('/activity/stats/');
+/** @param {{ from?: string, to?: string, page?: number }} [opts] - dates YYYY-MM-DD inclusive */
+export const getStats = async (opts = {}) => {
+  const params = new URLSearchParams();
+  if (opts.from) params.set('from', opts.from);
+  if (opts.to) params.set('to', opts.to);
+  if (opts.page != null) params.set('page', String(opts.page));
+  const qs = params.toString();
+  const res = await apiFetch(`/activity/stats/${qs ? `?${qs}` : ''}`);
   if (!res.ok) throw new Error('Failed to load stats');
   return res.json();
 };

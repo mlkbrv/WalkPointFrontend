@@ -1,0 +1,10 @@
+rm -rf node_modules
+rm -rf package-lock.json yarn.lock
+npm install
+cd android
+./gradlew clean
+./gradlew assembleRelease
+
+git add .
+git commit -m "final"
+git push

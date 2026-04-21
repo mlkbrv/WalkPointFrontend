@@ -21,6 +21,8 @@ import i18n, { loadStoredLanguage } from './i18n/config';
 enableScreens(true);
 
 import AccountScreen from './screens/AccountScreen';
+import AccountPrivacyScreen from './screens/AccountPrivacyScreen';
+import AccountSettingsScreen from './screens/AccountSettingsScreen';
 import HowToConnectStepsScreen from './screens/HowToConnectStepsScreen';
 import CouponDetailScreen from './screens/CouponDetailScreen';
 import CouponRedeemScreen from './screens/CouponRedeemScreen';
@@ -75,6 +77,8 @@ function AccountStackNav() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, detachInactiveScreens: true }}>
       <Stack.Screen name="AccountMain" component={AccountScreen} />
+      <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+      <Stack.Screen name="AccountPrivacy" component={AccountPrivacyScreen} />
       <Stack.Screen name="HowToConnectSteps" component={HowToConnectStepsScreen} />
     </Stack.Navigator>
   );

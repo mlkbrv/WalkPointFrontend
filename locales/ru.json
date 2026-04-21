@@ -65,6 +65,17 @@
     "pedometerNoDeviceTitle": "Шагомер недоступен",
     "pedometerNoDeviceMessage": "Устройство не поддерживает шаги. Дайте разрешение «Физическая активность» или подключите Health Connect / Apple Health."
   },
+  "bodyProfile": {
+    "title": "Параметры тела",
+    "subtitle": "В системе здоровья пока нет веса и роста. Укажите их вручную — так точнее считаются дистанция и калории.",
+    "weightLabel": "Вес (кг)",
+    "weightPlaceholder": "например 70",
+    "heightLabel": "Рост (см)",
+    "heightPlaceholder": "например 175",
+    "later": "Позже",
+    "errorWeight": "Укажите вес от 20 до 400 кг.",
+    "errorHeight": "Укажите рост от 40 до 260 см."
+  },
   "healthAlerts": {
     "iosDeniedTitle": "Нет доступа к «Здоровье»",
     "iosDeniedMessage": "Разрешите WalkPoint читать шаги, вес и рост в настройках приложения «Здоровье».",
@@ -148,6 +159,7 @@
     "totalTime": "Всего времени",
     "convertSteps": "Обменять {{count}} шагов на монеты",
     "howToSteps": "Как подключить шаги",
+    "bodyProfile": "Вес и рост",
     "settings": "Настройки",
     "notifications": "Уведомления",
     "privacy": "Конфиденциальность",
@@ -163,7 +175,19 @@
     "conversionTitle": "Обмен",
     "conversionFailed": "Не удалось обменять шаги.",
     "logoutTitle": "Выход",
-    "logoutMessage": "Выйти из аккаунта?"
+    "logoutMessage": "Выйти из аккаунта?",
+    "refreshData": "Обновить баланс и профиль",
+    "refreshDone": "Кошелёк, профиль и шаги обновлены.",
+    "refreshFailed": "Не удалось обновить. Проверьте сеть и попробуйте снова.",
+    "systemSettings": "Системные настройки приложения",
+    "stepsAndHealth": "Health Connect / Apple Здоровье",
+    "privacyBody": "WalkPoint использует ваш аккаунт для синхронизации шагов и наград. Данные об активности отправляются на серверы, чтобы начислять монеты и показывать прогресс. Геолокация используется только при записи маршрута. Вы можете выйти из аккаунта или изменить разрешения в настройках устройства в любой момент.",
+    "notificationsTitle": "Уведомления",
+    "notificationsMessage": "Чтобы разрешить или отключить уведомления, откройте системные настройки приложения WalkPoint.",
+    "openSettings": "Открыть настройки",
+    "aboutMessage": "WalkPoint\nВерсия {{version}}",
+    "moreMenuTitle": "Меню профиля",
+    "moreRefresh": "Обновить данные"
   },
   "market": {
     "title": "Магазин купонов",

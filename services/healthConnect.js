@@ -15,6 +15,7 @@ if (Platform.OS === 'android') {
       requestPermission: hc.requestPermission,
       getGrantedPermissions: hc.getGrantedPermissions,
       readRecords: hc.readRecords,
+      aggregateRecord: hc.aggregateRecord,
       openHealthConnectSettings: hc.openHealthConnectSettings,
     };
     SdkAvailabilityStatus = hc.SdkAvailabilityStatus;
@@ -101,22 +102,53 @@ function stepsFromRecord(r) {
   return r.count ?? r.steps ?? r.value ?? 0;
 }
 
+/**
+ * Health Connect–correct daily total: merges overlapping sources (Samsung + Fit, etc.).
+ * Summing readRecords('Steps') double-counts when multiple apps wrote overlapping intervals.
+ */
+async function aggregateStepsBetween(start, end) {
+  if (!HealthConnect?.aggregateRecord) return null;
+  try {
+    const agg = await HealthConnect.aggregateRecord({
+      recordType: 'Steps',
+      timeRangeFilter: {
+        operator: 'between',
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      },
+    });
+    const n = agg?.COUNT_TOTAL;
+    if (typeof n === 'number' && Number.isFinite(n)) {
+      return Math.max(0, Math.floor(n));
+    }
+  } catch (err) {
+    console.warn('Health Connect aggregateRecord(Steps):', err?.message ?? err);
+  }
+  return null;
+}
+
+/** Fallback when aggregate API fails (older HC / errors): may over-count with multiple sources. */
+async function sumStepsRecordsBetween(start, end) {
+  const result = await HealthConnect.readRecords('Steps', {
+    timeRangeFilter: {
+      operator: 'between',
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+    },
+  });
+  const records = result?.records ?? result ?? [];
+  if (!Array.isArray(records)) return 0;
+  return records.reduce((sum, r) => sum + stepsFromRecord(r), 0);
+}
+
 export const getTodaySteps = async () => {
   if (!isAvailable()) return 0;
   try {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const result = await HealthConnect.readRecords('Steps', {
-      timeRangeFilter: {
-        operator: 'between',
-        startTime: startOfDay.toISOString(),
-        endTime: now.toISOString(),
-      },
-    });
-    const records = result?.records ?? result ?? [];
-    if (!Array.isArray(records)) return 0;
-    const total = records.reduce((sum, r) => sum + stepsFromRecord(r), 0);
-    return total;
+    const aggregated = await aggregateStepsBetween(startOfDay, now);
+    if (aggregated != null) return aggregated;
+    return await sumStepsRecordsBetween(startOfDay, now);
   } catch (err) {
     console.error('Health Connect getTodaySteps:', err);
     return 0;
@@ -126,17 +158,9 @@ export const getTodaySteps = async () => {
 export const getStepsInRange = async (startDate, endDate) => {
   if (!isAvailable()) return 0;
   try {
-    const result = await HealthConnect.readRecords('Steps', {
-      timeRangeFilter: {
-        operator: 'between',
-        startTime: startDate.toISOString(),
-        endTime: endDate.toISOString(),
-      },
-    });
-    const records = result?.records || result || [];
-    return Array.isArray(records)
-      ? records.reduce((sum, r) => sum + (r.count || r.steps || 0), 0)
-      : 0;
+    const aggregated = await aggregateStepsBetween(startDate, endDate);
+    if (aggregated != null) return aggregated;
+    return await sumStepsRecordsBetween(startDate, endDate);
   } catch (err) {
     console.error('Health Connect getStepsInRange:', err);
     return 0;

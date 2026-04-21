@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   login as apiLogin,
   register as apiRegister,
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     try {
       const profile = await getProfile();
       setUser(profile);
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
     } catch {
       return null;
     }
-  };
+  }, []);
 
   const value = {
     user,

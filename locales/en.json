@@ -65,6 +65,17 @@
     "pedometerNoDeviceTitle": "Pedometer unavailable",
     "pedometerNoDeviceMessage": "Your device doesn't support step counting. Grant Physical Activity permission or connect Health Connect / Apple Health."
   },
+  "bodyProfile": {
+    "title": "Your body profile",
+    "subtitle": "Apple Health and Health Connect don’t have your weight or height yet. Enter them so distance and calories are more accurate.",
+    "weightLabel": "Weight (kg)",
+    "weightPlaceholder": "e.g. 70",
+    "heightLabel": "Height (cm)",
+    "heightPlaceholder": "e.g. 175",
+    "later": "Not now",
+    "errorWeight": "Enter a weight between 20 and 400 kg.",
+    "errorHeight": "Enter a height between 40 and 260 cm."
+  },
   "healthAlerts": {
     "iosDeniedTitle": "No Health access",
     "iosDeniedMessage": "Allow WalkPoint to read steps, weight, and height in the Health app's privacy settings.",
@@ -148,6 +159,7 @@
     "totalTime": "Total Time",
     "convertSteps": "Convert {{count}} steps to coins",
     "howToSteps": "How to connect steps",
+    "bodyProfile": "Weight & height",
     "settings": "Settings",
     "notifications": "Notifications",
     "privacy": "Privacy",
@@ -163,7 +175,19 @@
     "conversionTitle": "Conversion",
     "conversionFailed": "Could not convert steps.",
     "logoutTitle": "Log out",
-    "logoutMessage": "Are you sure you want to log out?"
+    "logoutMessage": "Are you sure you want to log out?",
+    "refreshData": "Refresh balance & profile",
+    "refreshDone": "Wallet, profile, and steps were refreshed.",
+    "refreshFailed": "Could not refresh. Check your connection and try again.",
+    "systemSettings": "System app settings",
+    "stepsAndHealth": "Health Connect / Apple Health",
+    "privacyBody": "WalkPoint uses your account to sync steps and rewards. Activity data is sent to our servers to credit coins and show your progress. Location is used only when you start a route. You can sign out or change permissions in system settings at any time.",
+    "notificationsTitle": "Notifications",
+    "notificationsMessage": "To allow or block notifications, open the system settings for WalkPoint.",
+    "openSettings": "Open settings",
+    "aboutMessage": "WalkPoint\nVersion {{version}}",
+    "moreMenuTitle": "Account menu",
+    "moreRefresh": "Refresh data"
   },
   "market": {
     "title": "Coupon Store",

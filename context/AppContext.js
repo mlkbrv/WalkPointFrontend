@@ -1,19 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as BackgroundFetch from 'expo-background-fetch';
-import * as Notifications from 'expo-notifications';
-import { Pedometer } from 'expo-sensors';
-import * as TaskManager from 'expo-task-manager';
 import React, { createContext, lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Linking, PermissionsAndroid, Platform, View } from 'react-native';
+import { ActivityIndicator, AppState, Platform, View } from 'react-native';
+import BodyProfileModal from '../components/BodyProfileModal';
 import { useHealthData } from '../hooks/useHealthData';
 import {
   convertSteps as apiConvertSteps,
+  getTokens,
   getWallet,
+  syncActivity as apiSyncActivity,
 } from '../services/apiService';
-import { getGoogleFitTodaySteps } from '../services/googleFitSteps';
 import * as healthService from '../services/healthService';
 import {
-  calculateCaloriesMET,
   calculateDistanceFromSteps,
   calculateWalkingCaloriesFromSteps,
   getDateKey
@@ -23,17 +20,25 @@ import i18n from '../i18n/config';
 const HealthConnectRequiredScreen = lazy(() => import('../screens/HealthConnectRequiredScreen'));
 const StepsOnboardingScreen = lazy(() => import('../screens/StepsOnboardingScreen'));
 
-// Import background actions for foreground service (works on Android for background step counting)
-let BackgroundService = null;
-try {
-  BackgroundService = require('react-native-background-actions').default;
-} catch (e) {
-  console.log('react-native-background-actions not available');
-}
-
-const BACKGROUND_FETCH_INTERVAL_SEC = 15 * 60; // 15 minutes
 const FOREGROUND_SYNC_INTERVAL_MS = 30 * 1000; // 30 seconds when app is active
-const BACKGROUND_SERVICE_SYNC_INTERVAL_MS = 60 * 1000; // 60 seconds in background service
+const ACTIVITY_PUSH_DEBOUNCE_MS = 12 * 1000;
+const STORAGE_USER_BODY_PROFILE_DISMISSED = 'userBodyProfilePromptDismissed';
+/** Persisted calendar day for detecting overnight gap when app was closed. */
+const CALENDAR_ROLLOVER_STORAGE_KEY = 'walkpoint_last_activity_calendar_date';
+/**
+ * On local calendar day change: POST /activity/sync/ then /activity/convert/ for the completed day.
+ * Disable if you only want manual exchange from Profile.
+ */
+const AUTO_FINALIZE_PREVIOUS_DAY_ON_SERVER = true;
+
+/** Matches backend ActivitySource (health_connect | pedometer | ios_health | unknown). */
+const activitySourceFromSystemSync = (platform, usedHealthKitOrHc) => {
+  if (usedHealthKitOrHc) {
+    return platform === 'ios' ? 'ios_health' : 'health_connect';
+  }
+  if (platform === 'ios') return 'pedometer';
+  return 'unknown';
+};
 
 const defaultDailyStatsShape = () => ({
   steps: 0,
@@ -81,124 +86,18 @@ const DEFAULT_APP_VALUE = {
   convertStepsToCoins: async () => null,
   refreshWallet: async () => {},
   fetchBackendData: async () => {},
+  bodyProfile: { weightKg: 75, heightCm: null },
+  openBodyProfileEditor: () => {},
 };
 
 const AppContext = createContext(DEFAULT_APP_VALUE);
 
 export const useApp = () => useContext(AppContext) ?? DEFAULT_APP_VALUE;
 
-const BACKGROUND_STEP_TASK = 'background-step-tracking';
-
-// Background service configuration for Android foreground service
-const backgroundServiceOptions = {
-  taskName: 'WalkPoint',
-  taskIcon: {
-    name: 'ic_launcher',
-    type: 'mipmap',
-  },
-  color: '#8140F3',
-  linkingURI: 'walkpoint://',
-  parameters: {
-    delay: BACKGROUND_SERVICE_SYNC_INTERVAL_MS,
-  },
-};
-
-TaskManager.defineTask(BACKGROUND_STEP_TASK, async ({ data, error }) => {
-  if (error) {
-    console.error('Background task error:', error);
-    return;
-  }
-
-  try {
-    const dateKey = getDateKey();
-    const storageKey = `dailyStats_${dateKey}`;
-
-    const savedStats = await AsyncStorage.getItem(storageKey);
-    let currentStats = savedStats ? JSON.parse(savedStats) : {
-      steps: 0,
-      time: 0,
-      calories: 0,
-      distance: 0,
-      date: dateKey,
-    };
-
-    // On Android, Pedometer.getStepCountAsync(date range) is not supported; steps come from Health Connect when app is in foreground
-    const isAvailable = await Pedometer.isAvailableAsync();
-    if (isAvailable && Platform.OS !== 'android') {
-      try {
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const now = new Date();
-
-        let newSteps = currentStats.steps || 0;
-        try {
-          const stepResult = await Pedometer.getStepCountAsync(startOfDay, now);
-          if (stepResult && stepResult.steps !== undefined) {
-            newSteps = stepResult.steps;
-          }
-        } catch {
-          // keep current
-        }
-
-        let weightKg = 75;
-        let heightCm = null;
-        try {
-          const ws = await AsyncStorage.getItem('userBodyWeightKg');
-          const hs = await AsyncStorage.getItem('userBodyHeightCm');
-          if (ws != null) {
-            const n = parseFloat(ws, 10);
-            if (Number.isFinite(n) && n > 20) weightKg = n;
-          }
-          if (hs != null) {
-            const n = parseFloat(hs, 10);
-            if (Number.isFinite(n) && n > 40) heightCm = n;
-          }
-        } catch (_) {}
-        const newCalories = calculateWalkingCaloriesFromSteps(newSteps, weightKg, heightCm);
-        const newDistance = calculateDistanceFromSteps(newSteps, heightCm);
-
-        const updatedStats = {
-          ...currentStats,
-          steps: newSteps,
-          calories: newCalories,
-          distance: newDistance,
-          lastUpdated: new Date().toISOString(),
-        };
-
-        await AsyncStorage.setItem(storageKey, JSON.stringify(updatedStats));
-
-        if (newSteps > (currentStats.steps || 0)) {
-          const totalStatsKey = 'totalStats';
-          const savedTotal = await AsyncStorage.getItem(totalStatsKey);
-          let totalStats = savedTotal ? JSON.parse(savedTotal) : {
-            steps: 0,
-            time: 0,
-            calories: 0,
-            distance: 0,
-          };
-
-          const stepDiff = newSteps - (currentStats.steps || 0);
-          totalStats.steps += stepDiff;
-          totalStats.calories = newCalories;
-          totalStats.distance = newDistance;
-          await AsyncStorage.setItem(totalStatsKey, JSON.stringify(totalStats));
-        }
-      } catch (stepError) {
-        console.error('Error in background step tracking:', stepError);
-      }
-    }
-
-    return BackgroundFetch.BackgroundFetchResult.NewData;
-  } catch (error) {
-    console.error('Background task execution error:', error);
-    return BackgroundFetch.BackgroundFetchResult.Failed;
-  }
-});
-
 export const AppProvider = ({ children }) => {
   const [stepCount, setStepCount] = useState(0);
   const [isTracking, setIsTracking] = useState(false);
-  const [subscription, setSubscription] = useState(null);
+  const [trackingStartTime, setTrackingStartTime] = useState(null);
   const defaultDailyStats = {
     steps: 0,
     time: 0,
@@ -217,25 +116,144 @@ export const AppProvider = ({ children }) => {
   });
   const [currentRoute, setCurrentRoute] = useState([]);
   const [isTrackingRoute, setIsTrackingRoute] = useState(false);
-  const [timeTrackingInterval, setTimeTrackingInterval] = useState(null);
-  const [trackingStartTime, setTrackingStartTime] = useState(null);
   const [bodyProfile, setBodyProfile] = useState({ weightKg: 75, heightCm: null });
   const bodyProfileRef = useRef({ weightKg: 75, heightCm: null });
-  const subscriptionRef = useRef(null);
-  const timeIntervalRef = useRef(null);
+  const [bodyProfileStorageLoaded, setBodyProfileStorageLoaded] = useState(false);
+  const [showBodyProfileModal, setShowBodyProfileModal] = useState(false);
+  const bodyProfileModalManualOpenRef = useRef(false);
   const syncIntervalRef = useRef(null);
   const dateCheckIntervalRef = useRef(null);
   const lastDateRef = useRef(getDateKey());
-  const stepsAtSubscriptionStartRef = useRef(0);
   const dailyStatsRef = useRef(defaultDailyStats);
-  const [activityPermissionGranted, setActivityPermissionGranted] = useState(false);
-  const permissionRequestedRef = useRef(false);
-  const [isBackgroundServiceRunning, setIsBackgroundServiceRunning] = useState(false);
-  const backgroundServiceRef = useRef(false);
+  const lastActivityPushRef = useRef({ date: '', steps: -1 });
+  const activityPushTimerRef = useRef(null);
+  const resetDailyStatsForNewDayRef = useRef(async (_previousDateKey) => {});
+  const syncStepsInFlightRef = useRef(false);
+  const rolloverInProgressRef = useRef(false);
+  const [activityPermissionGranted, setActivityPermissionGranted] = useState(true); // Always true now
+  const [isBackgroundServiceRunning] = useState(false);
 
   const healthData = useHealthData();
 
+  const refreshBodyProfileFromHealth = useCallback(async () => {
+    if (!healthData.isReady) return;
+    try {
+      const { weightKg, heightCm } = await healthService.getBodyProfile();
+      const prev = { ...bodyProfileRef.current };
+      const next = { ...bodyProfileRef.current };
+      let changed = false;
+      if (weightKg != null && Number.isFinite(weightKg) && weightKg > 20 && weightKg < 400) {
+        next.weightKg = weightKg;
+        await AsyncStorage.setItem('userBodyWeightKg', String(weightKg));
+        changed = true;
+      }
+      if (heightCm != null && Number.isFinite(heightCm) && heightCm > 40 && heightCm < 260) {
+        next.heightCm = heightCm;
+        await AsyncStorage.setItem('userBodyHeightCm', String(heightCm));
+        changed = true;
+      }
+      if (changed) {
+        bodyProfileRef.current = next;
+        setBodyProfile(next);
+        const hadHeight =
+          prev.heightCm != null && Number.isFinite(prev.heightCm) && prev.heightCm > 40;
+        if (
+          !hadHeight &&
+          next.heightCm != null &&
+          Number.isFinite(next.heightCm) &&
+          next.heightCm > 40
+        ) {
+          setShowBodyProfileModal(false);
+        }
+      }
+    } catch (_) {}
+  }, [healthData.isReady]);
+
   dailyStatsRef.current = dailyStats ?? defaultDailyStats;
+
+  // POST /activity/sync/ only — never calls /activity/convert/ (exchange is manual on Profile).
+  const pushActivityToBackend = useCallback(async (stats, source) => {
+    try {
+      const tokens = await getTokens();
+      if (!tokens?.access) return;
+      const date = stats.date || getDateKey();
+      const steps = Math.max(0, Math.floor(stats.steps ?? 0));
+      if (lastActivityPushRef.current.date === date && lastActivityPushRef.current.steps === steps) return;
+
+      const distanceKm = Number(stats.distance) || 0;
+      const payload = {
+        date,
+        steps,
+        calories: stats.calories != null ? Math.round(Number(stats.calories)) : undefined,
+        distance_m: distanceKm > 0 ? Math.round(distanceKm * 1000) : undefined,
+        duration_sec:
+          stats.time != null && Number(stats.time) > 0
+            ? Math.round(Number(stats.time) * 60)
+            : undefined,
+        source,
+      };
+
+      await apiSyncActivity(payload);
+      lastActivityPushRef.current = { date, steps };
+    } catch (err) {
+      console.warn('pushActivityToBackend:', err?.message ?? err);
+    }
+  }, []);
+
+  const scheduleDebouncedActivityPush = useCallback(
+    (source) => {
+      if (activityPushTimerRef.current) clearTimeout(activityPushTimerRef.current);
+      activityPushTimerRef.current = setTimeout(() => {
+        activityPushTimerRef.current = null;
+        const stats = dailyStatsRef.current;
+        if (!stats || (stats.steps ?? 0) < 1) return;
+        void pushActivityToBackend(stats, source);
+      }, ACTIVITY_PUSH_DEBOUNCE_MS);
+    },
+    [pushActivityToBackend],
+  );
+
+  /** End-of-day: sync + convert for a completed calendar day (yesterday). */
+  const finalizePreviousCalendarDayOnServer = useCallback(
+    async (previousDateKey, stats) => {
+      if (!AUTO_FINALIZE_PREVIOUS_DAY_ON_SERVER || !previousDateKey || !stats) return;
+      try {
+        const tokens = await getTokens();
+        if (!tokens?.access) return;
+        const steps = Math.max(0, Math.floor(stats.steps ?? 0));
+        if (steps < 1) return;
+
+        const usedNative =
+          Platform.OS === 'ios'
+            ? healthData.isReady
+            : Platform.OS === 'android' &&
+              healthData.healthConnectAvailable === true &&
+              healthData.isReady;
+        const source = activitySourceFromSystemSync(Platform.OS, usedNative);
+        const distanceKm = Number(stats.distance) || 0;
+        const payload = {
+          date: previousDateKey,
+          steps,
+          calories: stats.calories != null ? Math.round(Number(stats.calories)) : undefined,
+          distance_m: distanceKm > 0 ? Math.round(distanceKm * 1000) : undefined,
+          duration_sec:
+            stats.time != null && Number(stats.time) > 0
+              ? Math.round(Number(stats.time) * 60)
+              : undefined,
+          source,
+        };
+
+        await apiSyncActivity(payload);
+        const result = await apiConvertSteps(payload);
+        const bal = result?.new_balance ?? result?.balance;
+        if (bal != null && bal !== '') setWalletBalance(String(bal));
+        lastActivityPushRef.current = { date: previousDateKey, steps };
+      } catch (err) {
+        console.warn('finalizePreviousCalendarDayOnServer:', err?.message ?? err);
+      }
+    },
+    [healthData.isReady, healthData.healthConnectAvailable],
+  );
 
   useEffect(() => {
     bodyProfileRef.current = bodyProfile;
@@ -257,7 +275,10 @@ export const AppProvider = ({ children }) => {
         }
         bodyProfileRef.current = next;
         setBodyProfile(next);
-      } catch (_) {}
+      } catch (_) {
+      } finally {
+        setBodyProfileStorageLoaded(true);
+      }
     })();
   }, []);
 
@@ -265,199 +286,16 @@ export const AppProvider = ({ children }) => {
   const [walletBalance, setWalletBalance] = useState('0.00');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Request notification permission (required for foreground service on Android 13+)
-  const requestNotificationPermission = useCallback(async () => {
-    try {
-      if (Platform.OS === 'android' && Platform.Version >= 33) {
-        const { status } = await Notifications.requestPermissionsAsync();
-        return status === 'granted';
-      }
-      return true;
-    } catch (err) {
-      console.error('Error requesting notification permission:', err);
-      return false;
-    }
-  }, []);
-
-  // Request Activity Recognition permission (required for step counting on Android 10+)
+  // Steps come from Health Connect / Apple Health only.
   const requestActivityPermission = useCallback(async () => {
-    if (permissionRequestedRef.current) return activityPermissionGranted;
-    permissionRequestedRef.current = true;
-
-    try {
-      // Request notification permission first (needed for foreground service)
-      await requestNotificationPermission();
-
-      if (Platform.OS === 'android' && Platform.Version >= 29) {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
-          {
-            title: i18n.t('permissions.activityTitle'),
-            message: i18n.t('permissions.activityMessage'),
-            buttonNeutral: i18n.t('permissions.askLater'),
-            buttonNegative: i18n.t('common.cancel'),
-            buttonPositive: i18n.t('permissions.allow'),
-          }
-        );
-        
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('Activity recognition permission granted');
-          setActivityPermissionGranted(true);
-          return true;
-        } else if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-          Alert.alert(
-            i18n.t('permissions.activityDeniedTitle'),
-            i18n.t('permissions.activityDeniedMessage'),
-            [
-              { text: i18n.t('common.cancel'), style: 'cancel' },
-              { text: i18n.t('common.settings'), onPress: () => Linking.openSettings() },
-            ]
-          );
-          setActivityPermissionGranted(false);
-          return false;
-        } else {
-          console.log('Activity recognition permission denied');
-          setActivityPermissionGranted(false);
-          return false;
-        }
-      } else if (Platform.OS === 'ios') {
-        const isAvailable = await Pedometer.isAvailableAsync();
-        if (isAvailable) {
-          setActivityPermissionGranted(true);
-          return true;
-        }
-        Alert.alert(
-          i18n.t('permissions.pedometerUnavailableTitle'),
-          i18n.t('permissions.pedometerUnavailableMessage'),
-          [
-            { text: i18n.t('common.cancel'), style: 'cancel' },
-            { text: i18n.t('common.settings'), onPress: () => Linking.openSettings() },
-          ]
-        );
-        return false;
-      }
-      setActivityPermissionGranted(true);
-      return true;
-    } catch (err) {
-      console.error('Error requesting activity permission:', err);
-      return false;
-    }
-  }, [activityPermissionGranted, requestNotificationPermission]);
-
-  // Background task function that runs in foreground service
-  const backgroundStepTask = async (taskDataArguments) => {
-    const { delay } = taskDataArguments;
-    
-    await new Promise(async (resolve) => {
-      const syncStepsInBackground = async () => {
-        try {
-          // Android: Pedometer.getStepCountAsync(date range) not supported; steps sync via Health Connect when app is in foreground
-          if (Platform.OS === 'android') return;
-
-          const isAvailable = await Pedometer.isAvailableAsync();
-          if (!isAvailable) return;
-
-          const dateKey = getDateKey();
-          const storageKey = `dailyStats_${dateKey}`;
-          const savedStats = await AsyncStorage.getItem(storageKey);
-          let currentStats = savedStats ? JSON.parse(savedStats) : {
-            steps: 0, time: 0, calories: 0, distance: 0, date: dateKey,
-          };
-
-          const today = new Date();
-          const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          const now = new Date();
-          const stepResult = await Pedometer.getStepCountAsync(startOfDay, now);
-          const systemStepsToday = stepResult?.steps ?? 0;
-
-          if (systemStepsToday > currentStats.steps) {
-            let weightKg = 75;
-            let heightCm = null;
-            try {
-              const ws = await AsyncStorage.getItem('userBodyWeightKg');
-              const hs = await AsyncStorage.getItem('userBodyHeightCm');
-              if (ws != null) {
-                const n = parseFloat(ws, 10);
-                if (Number.isFinite(n) && n > 20) weightKg = n;
-              }
-              if (hs != null) {
-                const n = parseFloat(hs, 10);
-                if (Number.isFinite(n) && n > 40) heightCm = n;
-              }
-            } catch (_) {}
-            const newCalories = calculateWalkingCaloriesFromSteps(systemStepsToday, weightKg, heightCm);
-            const newDistance = calculateDistanceFromSteps(systemStepsToday, heightCm);
-            const updatedStats = {
-              ...currentStats,
-              steps: systemStepsToday,
-              calories: newCalories,
-              distance: newDistance,
-              lastUpdated: new Date().toISOString(),
-            };
-            await AsyncStorage.setItem(storageKey, JSON.stringify(updatedStats));
-            
-            // Update total stats
-            const savedTotal = await AsyncStorage.getItem('totalStats');
-            let totalStats = savedTotal ? JSON.parse(savedTotal) : { steps: 0, time: 0, calories: 0, distance: 0 };
-            const stepDiff = systemStepsToday - currentStats.steps;
-            totalStats.steps += stepDiff;
-            totalStats.distance = newDistance;
-            totalStats.calories = newCalories;
-            await AsyncStorage.setItem('totalStats', JSON.stringify(totalStats));
-            
-            console.log(`Background sync: ${systemStepsToday} steps`);
-          }
-        } catch (err) {
-          if (Platform.OS === 'android' && err?.message?.includes('not supported on Android')) return;
-          console.error('Background step sync error:', err);
-        }
-      };
-
-      // Keep running while background service is active
-      while (BackgroundService?.isRunning()) {
-        await syncStepsInBackground();
-        await new Promise(r => setTimeout(r, delay));
-      }
-      resolve();
-    });
-  };
-
-  // Start background foreground service for step counting
-  const startBackgroundService = useCallback(async () => {
-    if (!BackgroundService || backgroundServiceRef.current) return;
-    
-    try {
-      if (Platform.OS === 'android') {
-        await BackgroundService.start(backgroundStepTask, {
-          ...backgroundServiceOptions,
-          taskTitle: i18n.t('background.taskTitle'),
-          taskDesc: i18n.t('background.taskDesc'),
-        });
-        backgroundServiceRef.current = true;
-        setIsBackgroundServiceRunning(true);
-        console.log('Background step service started');
-      }
-    } catch (err) {
-      console.error('Failed to start background service:', err);
-    }
+    setActivityPermissionGranted(true);
+    return true;
   }, []);
 
-  // Stop background foreground service
-  const stopBackgroundService = useCallback(async () => {
-    if (!BackgroundService || !backgroundServiceRef.current) return;
-    
-    try {
-      await BackgroundService.stop();
-      backgroundServiceRef.current = false;
-      setIsBackgroundServiceRunning(false);
-      console.log('Background step service stopped');
-    } catch (err) {
-      console.error('Failed to stop background service:', err);
-    }
-  }, []);
-
-  // Sync steps from Health Connect or system pedometer
+  // Sync steps from Health Connect or Apple Health
   const syncStepsFromSystem = useCallback(async () => {
+    if (syncStepsInFlightRef.current) return;
+    syncStepsInFlightRef.current = true;
     try {
       const dateKey = getDateKey();
       const storageKey = `dailyStats_${dateKey}`;
@@ -471,6 +309,7 @@ export const AppProvider = ({ children }) => {
       };
 
       let systemStepsToday = 0;
+      let usedHealthNative = false;
 
       if (Platform.OS === 'android') {
         if (healthData.healthConnectAvailable === null) return;
@@ -478,66 +317,32 @@ export const AppProvider = ({ children }) => {
           if (healthData.healthConnectAvailable === true && healthData.isReady) {
             const hcSteps = await healthData.getTodaySteps();
             if (hcSteps > 0) console.log('Health Connect steps today:', hcSteps);
-            const gfSteps = await getGoogleFitTodaySteps();
-            if (gfSteps > 0) console.log('Google Fit steps today:', gfSteps);
-            systemStepsToday = Math.max(hcSteps || 0, gfSteps || 0);
-          } else {
-            systemStepsToday = await getGoogleFitTodaySteps();
-            if (systemStepsToday > 0) console.log('Google Fit steps today:', systemStepsToday);
+            systemStepsToday = hcSteps || 0;
+            usedHealthNative = true;
           }
         } catch (err) {
-          console.warn('Step count not supported on Android:', err?.message ?? err);
+          console.warn('Health Connect sync failed:', err?.message ?? err);
           systemStepsToday = 0;
         }
       }
-      // iOS: HealthKit when ready, else Pedometer fallback
       else if (Platform.OS === 'ios') {
         if (healthData.isReady) {
           try {
             systemStepsToday = await healthData.getTodaySteps();
+            usedHealthNative = true;
             console.log('iOS HealthKit steps today:', systemStepsToday);
           } catch (err) {
             console.warn('HealthKit step count failed:', err?.message ?? err);
           }
-        } else {
-          const pedometerAvailable = await Pedometer.isAvailableAsync();
-          if (pedometerAvailable) {
-            const today = new Date();
-            const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            const now = new Date();
-            try {
-              const stepResult = await Pedometer.getStepCountAsync(startOfDay, now);
-              systemStepsToday = stepResult?.steps ?? 0;
-              console.log('iOS Pedometer steps today:', systemStepsToday);
-            } catch (err) {
-              console.log('iOS getStepCountAsync failed:', err.message);
-            }
-          }
         }
       }
 
-      if (healthData.isReady) {
-        try {
-          const { weightKg, heightCm } = await healthService.getBodyProfile();
-          const next = { ...bodyProfileRef.current };
-          if (weightKg != null && Number.isFinite(weightKg) && weightKg > 20 && weightKg < 400) {
-            next.weightKg = weightKg;
-            await AsyncStorage.setItem('userBodyWeightKg', String(weightKg));
-          }
-          if (heightCm != null && Number.isFinite(heightCm) && heightCm > 40 && heightCm < 260) {
-            next.heightCm = heightCm;
-            await AsyncStorage.setItem('userBodyHeightCm', String(heightCm));
-          }
-          bodyProfileRef.current = next;
-          setBodyProfile(next);
-        } catch (_) {}
-      }
+      await refreshBodyProfileFromHealth();
 
       if (systemStepsToday <= 0) return;
 
       const prevSteps = currentStats.steps || 0;
       
-      // Only update if system has MORE steps (Health Connect tracks all day)
       if (systemStepsToday <= prevSteps) {
         console.log('No new steps:', systemStepsToday, 'vs saved', prevSteps);
         return;
@@ -549,10 +354,14 @@ export const AppProvider = ({ children }) => {
       const h = bodyProfileRef.current.heightCm;
       const newCalories = calculateWalkingCaloriesFromSteps(systemStepsToday, w, h);
       const newDistance = calculateDistanceFromSteps(systemStepsToday, h);
+      
+      // Calculate time based on steps (approx 100 steps per minute)
+      const newTime = Math.round(systemStepsToday / 100);
 
       const updatedStats = {
         ...currentStats,
         steps: systemStepsToday,
+        time: newTime,
         calories: newCalories,
         distance: newDistance,
         lastUpdated: new Date().toISOString(),
@@ -568,18 +377,137 @@ export const AppProvider = ({ children }) => {
         let totalStats = savedTotal ? JSON.parse(savedTotal) : { steps: 0, time: 0, calories: 0, distance: 0 };
         const stepDiff = systemStepsToday - prevSteps;
         totalStats.steps += stepDiff;
+        totalStats.time = newTime;
         totalStats.calories = newCalories;
         totalStats.distance = newDistance;
         await AsyncStorage.setItem(totalStatsKey, JSON.stringify(totalStats));
         setTotalStats(totalStats);
       }
+
+      const syncSource = activitySourceFromSystemSync(Platform.OS, usedHealthNative);
+      void pushActivityToBackend(updatedStats, syncSource);
     } catch (err) {
       console.error('syncStepsFromSystem error:', err);
+    } finally {
+      syncStepsInFlightRef.current = false;
     }
   }, [
     healthData.isReady,
     healthData.getTodaySteps,
     healthData.healthConnectAvailable,
+    pushActivityToBackend,
+    refreshBodyProfileFromHealth,
+  ]);
+
+  const saveUserBodyProfile = useCallback(
+    async (weightKg, heightCm) => {
+      const w = Number(weightKg);
+      const h = Number(heightCm);
+      if (!Number.isFinite(w) || w < 20 || w > 400 || !Number.isFinite(h) || h < 40 || h > 260) return;
+      try {
+        await AsyncStorage.setItem('userBodyWeightKg', String(w));
+        await AsyncStorage.setItem('userBodyHeightCm', String(h));
+        await AsyncStorage.setItem(STORAGE_USER_BODY_PROFILE_DISMISSED, '1');
+        const next = { weightKg: w, heightCm: h };
+        bodyProfileRef.current = next;
+        setBodyProfile(next);
+        bodyProfileModalManualOpenRef.current = false;
+        setShowBodyProfileModal(false);
+
+        const dateKey = getDateKey();
+        const storageKey = `dailyStats_${dateKey}`;
+        const stats = dailyStatsRef.current ?? defaultDailyStats;
+        const steps = stats.steps ?? 0;
+        if (steps > 0) {
+          const newCalories = calculateWalkingCaloriesFromSteps(steps, w, h);
+          const newDistance = calculateDistanceFromSteps(steps, h);
+          const updated = {
+            ...stats,
+            calories: newCalories,
+            distance: newDistance,
+            lastUpdated: new Date().toISOString(),
+          };
+          await AsyncStorage.setItem(storageKey, JSON.stringify(updated));
+          setDailyStats(updated);
+          const savedTotal = await AsyncStorage.getItem('totalStats');
+          let total = savedTotal ? JSON.parse(savedTotal) : { steps: 0, time: 0, calories: 0, distance: 0 };
+          total.calories = newCalories;
+          total.distance = newDistance;
+          await AsyncStorage.setItem('totalStats', JSON.stringify(total));
+          setTotalStats(total);
+        }
+        scheduleDebouncedActivityPush('unknown');
+      } catch (err) {
+        console.warn('saveUserBodyProfile:', err?.message ?? err);
+      }
+    },
+    [scheduleDebouncedActivityPush],
+  );
+
+  const dismissBodyProfilePrompt = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_USER_BODY_PROFILE_DISMISSED, '1');
+    } catch (_) {}
+    setShowBodyProfileModal(false);
+  }, []);
+
+  const closeBodyProfileModalOnly = useCallback(() => {
+    bodyProfileModalManualOpenRef.current = false;
+    setShowBodyProfileModal(false);
+  }, []);
+
+  const handleBodyProfileLater = useCallback(async () => {
+    if (bodyProfileModalManualOpenRef.current) {
+      closeBodyProfileModalOnly();
+      return;
+    }
+    await dismissBodyProfilePrompt();
+  }, [closeBodyProfileModalOnly, dismissBodyProfilePrompt]);
+
+  const openBodyProfileEditor = useCallback(() => {
+    bodyProfileModalManualOpenRef.current = true;
+    setShowBodyProfileModal(true);
+  }, []);
+
+  useEffect(() => {
+    if (!bodyProfileStorageLoaded) return;
+    if (healthData.isCheckingHealthConnect) return;
+
+    const onboardingBlocking =
+      healthData.needsHealthConnectScreen ||
+      (healthData.isAvailable &&
+        healthData.healthConnectAvailable === true &&
+        !healthData.isReady &&
+        (Platform.OS === 'android' || Platform.OS === 'ios'));
+
+    if (onboardingBlocking) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const dismissed = await AsyncStorage.getItem(STORAGE_USER_BODY_PROFILE_DISMISSED);
+        if (cancelled || dismissed === '1') return;
+        if (healthData.isReady) {
+          await refreshBodyProfileFromHealth();
+        }
+        if (cancelled) return;
+        const h = bodyProfileRef.current.heightCm;
+        if (h != null && Number.isFinite(h) && h > 40) return;
+        bodyProfileModalManualOpenRef.current = false;
+        setShowBodyProfileModal(true);
+      } catch (_) {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    bodyProfileStorageLoaded,
+    healthData.isCheckingHealthConnect,
+    healthData.isReady,
+    healthData.isAvailable,
+    healthData.healthConnectAvailable,
+    healthData.needsHealthConnectScreen,
+    refreshBodyProfileFromHealth,
   ]);
 
   // On mount: do NOT call healthData.init() here — it triggers requestPermissions() which crashes
@@ -590,7 +518,6 @@ export const AppProvider = ({ children }) => {
       try {
         await requestActivityPermission();
         loadData();
-        initializeBackgroundFetch();
         fetchBackendData();
       } catch (err) {
         console.error('AppContext initialize error:', err);
@@ -603,6 +530,18 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const initSteps = async () => {
       try {
+        const today = getDateKey();
+        const stored = await AsyncStorage.getItem(CALENDAR_ROLLOVER_STORAGE_KEY);
+        if (!stored) {
+          await AsyncStorage.setItem(CALENDAR_ROLLOVER_STORAGE_KEY, today);
+          lastDateRef.current = today;
+        } else if (stored !== today) {
+          await resetDailyStatsForNewDayRef.current(stored);
+          lastDateRef.current = today;
+        } else {
+          lastDateRef.current = today;
+        }
+
         const hasPermission = await requestActivityPermission();
         if (hasPermission) {
           await loadTodayStats();
@@ -620,6 +559,12 @@ export const AppProvider = ({ children }) => {
     let delayTimer = null;
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
+        const today = getDateKey();
+        if (today !== lastDateRef.current) {
+          const previousDateKey = lastDateRef.current;
+          lastDateRef.current = today;
+          void resetDailyStatsForNewDayRef.current(previousDateKey);
+        }
         syncStepsFromSystem();
         if (delayTimer) clearTimeout(delayTimer);
         delayTimer = setTimeout(syncStepsFromSystem, 2000);
@@ -635,8 +580,9 @@ export const AppProvider = ({ children }) => {
     dateCheckIntervalRef.current = setInterval(() => {
       const currentDateKey = getDateKey();
       if (currentDateKey !== lastDateRef.current) {
+        const previousDateKey = lastDateRef.current;
         lastDateRef.current = currentDateKey;
-        resetDailyStatsForNewDay();
+        void resetDailyStatsForNewDayRef.current(previousDateKey);
       }
     }, 60000);
 
@@ -650,14 +596,6 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.remove();
-        subscriptionRef.current = null;
-      }
-      if (timeIntervalRef.current) {
-        clearInterval(timeIntervalRef.current);
-        timeIntervalRef.current = null;
-      }
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current);
         syncIntervalRef.current = null;
@@ -665,6 +603,10 @@ export const AppProvider = ({ children }) => {
       if (dateCheckIntervalRef.current) {
         clearInterval(dateCheckIntervalRef.current);
         dateCheckIntervalRef.current = null;
+      }
+      if (activityPushTimerRef.current) {
+        clearTimeout(activityPushTimerRef.current);
+        activityPushTimerRef.current = null;
       }
     };
   }, []);
@@ -683,17 +625,38 @@ export const AppProvider = ({ children }) => {
   const convertStepsToCoins = async () => {
     const stats = dailyStats ?? defaultDailyStats;
     if (!stats || stats.steps < 1) return null;
+    const usedNative =
+      Platform.OS === 'ios'
+        ? healthData.isReady
+        : Platform.OS === 'android' &&
+          healthData.healthConnectAvailable === true &&
+          healthData.isReady;
+    const source = activitySourceFromSystemSync(Platform.OS, usedNative);
     setIsSyncing(true);
     try {
-      const result = await apiConvertSteps(stats.steps);
-      setWalletBalance(result.new_balance);
+      const result = await apiConvertSteps({
+        steps: Math.floor(stats.steps),
+        date: stats.date || getDateKey(),
+        calories: stats.calories != null ? Math.round(Number(stats.calories)) : undefined,
+        distance_m:
+          stats.distance != null && Number(stats.distance) > 0
+            ? Math.round(Number(stats.distance) * 1000)
+            : undefined,
+        duration_sec:
+          stats.time != null && Number(stats.time) > 0
+            ? Math.round(Number(stats.time) * 60)
+            : undefined,
+        source,
+      });
+      const bal = result?.new_balance ?? result?.balance;
+      if (bal != null && bal !== '') setWalletBalance(String(bal));
       return result;
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const refreshWallet = async () => {
+  const refreshWallet = useCallback(async () => {
     try {
       const wallet = await getWallet();
       setWalletBalance(wallet.balance || '0.00');
@@ -701,24 +664,9 @@ export const AppProvider = ({ children }) => {
     } catch {
       return null;
     }
-  };
+  }, []);
 
   // ── Existing local logic (unchanged) ──
-
-  const initializeBackgroundFetch = async () => {
-    try {
-      const bgStatus = await BackgroundFetch.getStatusAsync();
-      if (bgStatus === BackgroundFetch.BackgroundFetchStatus.Available) {
-        await BackgroundFetch.registerTaskAsync(BACKGROUND_STEP_TASK, {
-          minimumInterval: BACKGROUND_FETCH_INTERVAL_SEC,
-          stopOnTerminate: false,
-          startOnBoot: true,
-        });
-      }
-    } catch {
-      // silently ignore in dev
-    }
-  };
 
   const loadTodayStats = async () => {
     try {
@@ -809,107 +757,9 @@ export const AppProvider = ({ children }) => {
   const startStepTracking = async () => {
     if (isTracking) return true;
 
-    // Ensure permission is granted before starting
-    const hasPermission = await requestActivityPermission();
-    if (!hasPermission) {
-      console.warn('Activity permission not granted');
-      Alert.alert(
-        i18n.t('permissions.noPermissionTitle'),
-        i18n.t('permissions.noPermissionMessage')
-      );
-      return false;
-    }
-
-    const isAvailable = await Pedometer.isAvailableAsync();
-    console.log('Pedometer available:', isAvailable);
-
-    const healthBackedSteps =
-      healthData.isReady ||
-      (Platform.OS === 'android' && healthData.healthConnectAvailable === true);
-    if (!isAvailable && !healthBackedSteps) {
-      console.warn('Pedometer is not available');
-      Alert.alert(
-        i18n.t('permissions.pedometerNoDeviceTitle'),
-        i18n.t('permissions.pedometerNoDeviceMessage')
-      );
-      return false;
-    }
-
     setIsTracking(true);
     setTrackingStartTime(new Date());
-    const startTime = new Date();
 
-    // Start background foreground service for continuous step counting (Android)
-    if (Platform.OS === 'android') {
-      startBackgroundService();
-    }
-
-    // On Android with Health Connect: Pedometer conflicts with syncStepsFromSystem (overwrites 1354 with ~10).
-    // Skip Pedometer, rely only on syncStepsFromSystem interval.
-    const usePedometer = Platform.OS !== 'android' || !healthData.isReady;
-
-    stepsAtSubscriptionStartRef.current = dailyStatsRef.current?.steps ?? 0;
-
-    const sub = usePedometer ? Pedometer.watchStepCount((result) => {
-      const baseSteps = stepsAtSubscriptionStartRef.current;
-      const newSteps = baseSteps + (result?.steps ?? 0);
-      if (newSteps > 0) console.log('Live step update:', newSteps);
-
-      setDailyStats((prev) => {
-        const safePrev = prev ?? defaultDailyStats;
-        const steps = baseSteps + (result?.steps ?? 0);
-        const bp = bodyProfileRef.current;
-        const newDistance = calculateDistanceFromSteps(steps, bp.heightCm);
-        const newCalories = calculateWalkingCaloriesFromSteps(steps, bp.weightKg, bp.heightCm);
-
-        const newStats = {
-          ...safePrev,
-          steps,
-          distance: newDistance,
-          calories: newCalories,
-          lastUpdated: new Date().toISOString(),
-        };
-
-        const dateKey = getDateKey();
-        const storageKey = `dailyStats_${dateKey}`;
-        saveData(storageKey, newStats);
-
-        return newStats;
-      });
-
-      setStepCount(baseSteps + (result?.steps ?? 0));
-    }) : null;
-    
-    subscriptionRef.current = sub;
-    setSubscription(sub);
-    if (usePedometer) console.log('Step tracking subscription started');
-
-    // Time elapsed (active walking) – update every minute
-    timeIntervalRef.current = setInterval(() => {
-      const elapsed = Math.floor((new Date() - startTime) / 1000 / 60);
-      const timeHours = elapsed / 60;
-
-      setDailyStats((prev) => {
-        const safePrev = prev ?? defaultDailyStats;
-        const bp = bodyProfileRef.current;
-        const newCalories = calculateWalkingCaloriesFromSteps(safePrev.steps, bp.weightKg, bp.heightCm);
-        const newDistance = calculateDistanceFromSteps(safePrev.steps, bp.heightCm);
-
-        const newStats = {
-          ...safePrev,
-          time: elapsed,
-          calories: newCalories,
-          distance: newDistance,
-        };
-
-        const dateKey = getDateKey();
-        const storageKey = `dailyStats_${dateKey}`;
-        saveData(storageKey, newStats);
-        return newStats;
-      });
-    }, 60000);
-
-    // Also try to sync historical steps (works on iOS, may work on some Android)
     syncStepsFromSystem();
     syncIntervalRef.current = setInterval(syncStepsFromSystem, FOREGROUND_SYNC_INTERVAL_MS);
 
@@ -917,23 +767,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const stopStepTracking = async () => {
-    if (subscriptionRef.current) {
-      subscriptionRef.current.remove();
-      subscriptionRef.current = null;
-      setSubscription(null);
-    }
-    if (timeIntervalRef.current) {
-      clearInterval(timeIntervalRef.current);
-      timeIntervalRef.current = null;
-    }
     if (syncIntervalRef.current) {
       clearInterval(syncIntervalRef.current);
       syncIntervalRef.current = null;
-    }
-    
-    // Stop background foreground service (Android)
-    if (Platform.OS === 'android') {
-      await stopBackgroundService();
     }
     
     setTrackingStartTime(null);
@@ -958,15 +794,30 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const resetDailyStatsForNewDay = async () => {
+  const resetDailyStatsForNewDay = async (previousDateKey) => {
+    if (!previousDateKey) return;
+    if (rolloverInProgressRef.current) return;
+    rolloverInProgressRef.current = true;
     try {
-      const previousDateKey = lastDateRef.current;
+      const curCal = await AsyncStorage.getItem(CALENDAR_ROLLOVER_STORAGE_KEY);
+      if (curCal != null && curCal !== previousDateKey) {
+        lastDateRef.current = getDateKey();
+        return;
+      }
+
+      if (activityPushTimerRef.current) {
+        clearTimeout(activityPushTimerRef.current);
+        activityPushTimerRef.current = null;
+      }
+      lastActivityPushRef.current = { date: '', steps: -1 };
+
       const previousStorageKey = `dailyStats_${previousDateKey}`;
       const previousStats = await AsyncStorage.getItem(previousStorageKey);
 
       if (previousStats) {
         const stats = JSON.parse(previousStats);
         if (stats.steps > 0 || stats.time > 0) {
+          await finalizePreviousCalendarDayOnServer(previousDateKey, stats);
           await addTrackingSession({
             ...stats,
             date: previousDateKey,
@@ -990,6 +841,10 @@ export const AppProvider = ({ children }) => {
       const storageKey = `dailyStats_${dateKey}`;
       await saveData(storageKey, resetStats);
 
+      try {
+        await AsyncStorage.setItem(CALENDAR_ROLLOVER_STORAGE_KEY, dateKey);
+      } catch (_) {}
+
       await loadWeeklyProgress();
 
       setTimeout(async () => {
@@ -997,8 +852,11 @@ export const AppProvider = ({ children }) => {
       }, 1000);
     } catch (error) {
       console.error('Error resetting stats for new day:', error);
+    } finally {
+      rolloverInProgressRef.current = false;
     }
   };
+  resetDailyStatsForNewDayRef.current = resetDailyStatsForNewDay;
 
   const addTrackingSession = async (session) => {
     const newHistory = [session, ...trackingHistory];
@@ -1064,16 +922,18 @@ export const AppProvider = ({ children }) => {
     refreshHealthConnectStatus: healthData.refreshHealthConnectStatus,
     healthConnectPlayUrl: healthData.healthConnectPlayUrl,
     syncStepsFromSystem,
-    // background service
+    // background service (disabled)
     isBackgroundServiceRunning,
-    startBackgroundService,
-    stopBackgroundService,
+    startBackgroundService: async () => {},
+    stopBackgroundService: async () => {},
     // backend-connected
     walletBalance,
     isSyncing,
     convertStepsToCoins,
     refreshWallet,
     fetchBackendData,
+    bodyProfile,
+    openBodyProfileEditor,
   };
 
   if (healthData.isCheckingHealthConnect) {
@@ -1105,7 +965,16 @@ export const AppProvider = ({ children }) => {
           <StepsOnboardingScreen />
         </Suspense>
       ) : (
-        children
+        <>
+          {children}
+          <BodyProfileModal
+            visible={showBodyProfileModal}
+            initialWeightKg={bodyProfile.weightKg}
+            initialHeightCm={bodyProfile.heightCm}
+            onSave={saveUserBodyProfile}
+            onLater={handleBodyProfileLater}
+          />
+        </>
       )}
     </AppContext.Provider>
   );
