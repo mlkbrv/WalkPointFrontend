@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -14,10 +15,21 @@ import { useApp } from '../context/AppContext';
 export default function StepsOnboardingScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { requestHealthConnectPermission, openHealthConnectSettings } = useApp();
+  const {
+    requestHealthConnectPermission,
+    openHealthConnectSettings,
+    continueWithNativeSensorWithoutHc,
+  } = useApp();
 
   const handleConnectSteps = async () => {
     await requestHealthConnectPermission?.();
+  };
+
+  const handleUsePhoneSensor = async () => {
+    const ok = await continueWithNativeSensorWithoutHc?.();
+    if (!ok) {
+      Alert.alert(t('common.error'), t('onboarding.usePhoneSensorHint'));
+    }
   };
 
   if (Platform.OS !== 'android' && Platform.OS !== 'ios') return null;
@@ -44,6 +56,20 @@ export default function StepsOnboardingScreen() {
           >
             <Text style={styles.openHealthButtonText}>{t('onboarding.openHc')}</Text>
           </Pressable>
+        )}
+        {!isIos && (
+          <>
+            <Pressable
+              style={styles.sensorBypassButton}
+              onPress={handleUsePhoneSensor}
+              android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
+            >
+              <Text style={styles.sensorBypassButtonText}>{t('onboarding.usePhoneSensor')}</Text>
+            </Pressable>
+            <Text style={[styles.hintSecondary, { marginBottom: 8 }]}>
+              {t('onboarding.usePhoneSensorHint')}
+            </Text>
+          </>
         )}
         <Pressable
           style={styles.connectButton}
@@ -112,6 +138,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#5E35B1',
+  },
+  sensorBypassButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#8140F3',
+  },
+  sensorBypassButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8140F3',
   },
   connectButton: {
     backgroundColor: '#8140F3',

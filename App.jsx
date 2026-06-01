@@ -24,6 +24,20 @@ import AccountScreen from './screens/AccountScreen';
 import AccountPrivacyScreen from './screens/AccountPrivacyScreen';
 import AccountSettingsScreen from './screens/AccountSettingsScreen';
 import HowToConnectStepsScreen from './screens/HowToConnectStepsScreen';
+import PartnerHubScreen from './screens/PartnerHubScreen';
+import TransactionsScreen from './screens/TransactionsScreen';
+import FeaturesScreen from './screens/FeaturesScreen';
+import StreaksScreen from './screens/StreaksScreen';
+import ChallengesScreen from './screens/ChallengesScreen';
+import AchievementsScreen from './screens/AchievementsScreen';
+import FriendsScreen from './screens/FriendsScreen';
+import TeamsScreen from './screens/TeamsScreen';
+import FavoritesScreen from './screens/FavoritesScreen';
+import BoostShopScreen from './screens/BoostShopScreen';
+import PremiumScreen from './screens/PremiumScreen';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
+import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
+import * as Linking from 'expo-linking';
 import CouponDetailScreen from './screens/CouponDetailScreen';
 import CouponRedeemScreen from './screens/CouponRedeemScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -60,6 +74,7 @@ function MarketStackNav() {
       <MarketStack.Screen name="CouponStore" component={MarketScreen} />
       <MarketStack.Screen name="CouponDetail" component={CouponDetailScreen} />
       <MarketStack.Screen name="CouponRedeem" component={CouponRedeemScreen} />
+      <MarketStack.Screen name="Favorites" component={FavoritesScreen} />
     </MarketStack.Navigator>
   );
 }
@@ -69,9 +84,25 @@ function AuthNavigator() {
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </AuthStack.Navigator>
   );
 }
+
+const linking = {
+  prefixes: [Linking.createURL('/'), 'walkpoint://'],
+  config: {
+    screens: {
+      Register: {
+        path: 'register',
+        parse: {
+          ref: (ref) => (ref ? String(ref) : ''),
+        },
+      },
+      ForgotPassword: 'forgot-password',
+    },
+  },
+};
 
 function AccountStackNav() {
   return (
@@ -80,6 +111,18 @@ function AccountStackNav() {
       <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
       <Stack.Screen name="AccountPrivacy" component={AccountPrivacyScreen} />
       <Stack.Screen name="HowToConnectSteps" component={HowToConnectStepsScreen} />
+      <Stack.Screen name="Transactions" component={TransactionsScreen} />
+      <Stack.Screen name="PartnerHub" component={PartnerHubScreen} />
+      <Stack.Screen name="Features" component={FeaturesScreen} />
+      <Stack.Screen name="Streaks" component={StreaksScreen} />
+      <Stack.Screen name="Challenges" component={ChallengesScreen} />
+      <Stack.Screen name="Achievements" component={AchievementsScreen} />
+      <Stack.Screen name="Friends" component={FriendsScreen} />
+      <Stack.Screen name="Teams" component={TeamsScreen} />
+      <Stack.Screen name="BoostShop" component={BoostShopScreen} />
+      <Stack.Screen name="Premium" component={PremiumScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <Stack.Screen name="Favorites" component={FavoritesScreen} />
     </Stack.Navigator>
   );
 }
@@ -273,7 +316,7 @@ function App() {
     <AppErrorBoundary>
       <SafeAreaProvider>
         <AuthProvider>
-          <NavigationContainer>
+          <NavigationContainer linking={linking}>
             <RootNavigator />
           </NavigationContainer>
         </AuthProvider>

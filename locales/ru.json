@@ -41,7 +41,13 @@
     "logInBold": "Войти",
     "fillRequired": "Заполните обязательные поля.",
     "passwordMin": "Пароль не короче 8 символов.",
-    "registrationFailed": "Регистрация не удалась"
+    "registrationFailed": "Регистрация не удалась",
+    "referralCode": "Реферальный код (необязательно)",
+    "forgotPassword": "Забыли пароль?",
+    "resetEmailSent": "Если email найден, инструкции отправлены.",
+    "resetDone": "Пароль обновлён. Можно войти.",
+    "resetTitle": "Сброс пароля",
+    "resetConfirm": "Подтвердить"
   },
   "appError": {
     "title": "Произошла ошибка. Перезапустите приложение.",
@@ -99,7 +105,11 @@
     "coinsEarnedTitle": "Монеты начислены!",
     "coinsEarnedMessage": "Вы получили {{amount}} монет.\nНовый баланс: {{balance}}",
     "noStories": "Нет доступных историй",
+    "storiesUnavailable": "Не удалось загрузить истории. Попробуйте позже.",
     "steps": "Шаги",
+    "goalLabel": "Цель {{goal}}",
+    "coinsPreview": "{{coins}} монет · до 5k: {{left}}",
+    "quickMore": "Ещё функции",
     "time": "время",
     "kcal": "ккал",
     "km": "км",
@@ -113,6 +123,8 @@
     "subtitleIos": "WalkPoint читает шаги, вес и рост из приложения «Здоровье», чтобы точнее считать калории за день.\n\nНажмите «Разрешить доступ» — в системном окне включите шаги, вес и рост для WalkPoint.",
     "subtitleAndroid": "WalkPoint получает данные о шагах, весе и росте из Health Connect.\n\nСначала откройте Health Connect (кнопка ниже), затем нажмите «Подключить шаги» — в окне выберите WalkPoint и разрешите доступ к шагам (и при необходимости к весу и росту).",
     "openHc": "Открыть Health Connect",
+    "usePhoneSensor": "Только датчик телефона",
+    "usePhoneSensorHint": "Шаги в фоне без Health Connect (нужен аппаратный датчик шагов).",
     "connectSteps": "Подключить шаги",
     "allowAccess": "Разрешить доступ",
     "hintIos": "Если окно не появилось: Настройки → Конфиденциальность → Здоровье → Доступ к данным → WalkPoint.",
@@ -158,6 +170,7 @@
     "totalSteps": "Всего шагов",
     "totalTime": "Всего времени",
     "convertSteps": "Обменять {{count}} шагов на монеты",
+    "economyHint": "От {{min}} шагов: {{base}} монет, +1 за каждые 1000. Прошлые дни: {{window}} дн. В полночь авто-конвертация при ≥{{min}} шагов.",
     "howToSteps": "Как подключить шаги",
     "bodyProfile": "Вес и рост",
     "settings": "Настройки",
@@ -187,14 +200,63 @@
     "openSettings": "Открыть настройки",
     "aboutMessage": "WalkPoint\nВерсия {{version}}",
     "moreMenuTitle": "Меню профиля",
-    "moreRefresh": "Обновить данные"
+    "moreRefresh": "Обновить данные",
+    "referralCode": "Ваш реферальный код: {{code}}",
+    "transactions": "История транзакций",
+    "partnerHub": "Кабинет партнёра",
+    "features": "Ещё",
+    "stepGoal": "Цель шагов в день",
+    "stepGoalSaved": "Цель сохранена",
+    "stepGoalInvalid": "Введите цель от 1000 до 100 000 шагов"
+  },
+  "transactions": {
+    "title": "Транзакции",
+    "empty": "Транзакций пока нет",
+    "loadFailed": "Не удалось загрузить транзакции",
+    "typeSteps": "Конвертация шагов",
+    "typeStory": "Награда за сторис",
+    "typeCoupon": "Покупка купона",
+    "typeReferral": "Реферальный бонус",
+    "typeOther": "Операция"
+  },
+  "partnerHub": {
+    "title": "Кабинет партнёра",
+    "profileSection": "Профиль бренда",
+    "brandName": "Название бренда",
+    "description": "Описание",
+    "saveProfile": "Сохранить профиль",
+    "profileSaved": "Профиль обновлён",
+    "storySection": "Новая сторис",
+    "storyUrl": "URL медиа",
+    "storyReward": "Награда (монеты)",
+    "createStory": "Опубликовать сторис",
+    "storyCreated": "Сторис создана",
+    "storyUrlRequired": "Укажите URL медиа",
+    "couponSection": "Новый купон",
+    "couponTitle": "Название",
+    "couponDesc": "Описание",
+    "couponPrice": "Цена (монеты)",
+    "couponQty": "Количество",
+    "createCoupon": "Создать купон",
+    "couponCreated": "Купон создан",
+    "couponTitleRequired": "Укажите название купона",
+    "redeemSection": "Погашение купона",
+    "redeemCode": "Код купона / QR",
+    "redeem": "Погасить",
+    "redeemed": "Купон погашен",
+    "scanQr": "Сканировать QR"
   },
   "market": {
     "title": "Магазин купонов",
     "empty": "Пока нет доступных купонов",
     "stepsPrice": "{{steps}} шагов",
     "coinsShort": "{{coins}} мон",
-    "offerFallback": "Предложение"
+    "offerFallback": "Предложение",
+    "categoryAll": "Все",
+    "categoryFood": "Еда",
+    "categorySport": "Спорт",
+    "categoryBeauty": "Красота",
+    "categoryOther": "Другое"
   },
   "myCoupons": {
     "title": "Мои купоны",
@@ -215,7 +277,9 @@
     "usageTitle": "Как использовать",
     "usageText": "Покажите этот экран или QR-код на кассе. Сотрудник может запросить PIN или отсканировать код.",
     "shareMessage": "{{title}} – {{partner}}\nКод: {{code}}\nДействует до: {{date}}",
-    "shareTitle": "Купон {{partner}}"
+    "shareTitle": "Купон {{partner}}",
+    "favorited": "В избранном",
+    "unfavorited": "Убрано из избранного"
   },
   "couponRedeem": {
     "insufficientTitle": "Недостаточно монет",
@@ -235,6 +299,10 @@
     "totalStepsCaption": "Всего шагов за всё время.",
     "statistics": "Статистика",
     "thisWeek": "Эта неделя",
+    "prevWeek": "Предыдущая неделя",
+    "nextWeek": "Следующая неделя",
+    "prevMonth": "Предыдущий месяц",
+    "nextMonth": "Следующий месяц",
     "yourProgress": "Ваш прогресс",
     "thisMonth": "Этот месяц",
     "allHistory": "Вся история",
@@ -244,24 +312,118 @@
       "Time": "Время",
       "Calorie": "Калории",
       "Distance": "Дистанция"
-    }
+    },
+    "potentialCoins": "Можно получить: {{coins}} монет",
+    "claimCoins": "Забрать монеты",
+    "claimMinSteps": "Нужно минимум 5000 шагов",
+    "alreadyConverted": "Уже обменено за этот день",
+    "claimed": "Получено {{coins}} монет. Баланс: {{balance}}"
   },
   "history": {
     "title": "История",
     "today": "Сегодня",
     "yesterday": "Вчера",
     "empty": "Пока нет истории",
-    "emptySub": "Начните отслеживать активность — записи появятся здесь.",
+    "emptySub": "Здесь появятся сохранённые дни по шагам и завершённые маршруты.",
+    "routeSession": "GPS-маршрут",
+    "detailTitle": "Детали активности",
     "steps": "шаги",
     "time": "время",
     "kcal": "ккал",
     "km": "км"
+  },
+  "nativeSteps": {
+    "interruptTitle": "Отслеживание остановлено",
+    "interruptMessage": "Фоновый подсчёт шагов остановлен (приложение закрыто или снято с недавних задач). Откройте приложение, чтобы продолжить."
   },
   "scoreboard": {
     "title": "Недельный рейтинг",
     "you": "Вы",
     "youAre": "Вы на {{rank}} месте",
     "above": "Выше: {{name}} ({{score}})",
-    "below": "Ниже: {{name}} ({{score}})"
+    "below": "Ниже: {{name}} ({{score}})",
+    "tabGlobal": "Общий",
+    "tabFriends": "Друзья",
+    "tabTeam": "Команда",
+    "teamEmpty": "Вступите в команду или создайте свою, чтобы видеть рейтинг.",
+    "joinTeam": "Открыть команды"
+  },
+  "features": {
+    "title": "Ещё",
+    "heroTitle": "Возможности WalkPoint",
+    "heroSub": "Стрики, челленджи, друзья, бусты и другое.",
+    "sectionProgress": "Прогресс",
+    "sectionSocial": "Социальное",
+    "sectionShop": "Награды",
+    "sectionAccount": "Аккаунт",
+    "streaks": "Стрики",
+    "challenges": "Челленджи",
+    "achievements": "Достижения",
+    "friends": "Друзья",
+    "teams": "Команды",
+    "favorites": "Избранное",
+    "boosts": "Бусты",
+    "premium": "Премиум",
+    "transactions": "Транзакции",
+    "partner": "Партнёр"
+  },
+  "streaks": {
+    "daysInRow": "дней подряд",
+    "lastDay": "Последний день: {{date}}",
+    "tipTitle": "Не теряй огонь",
+    "tipBody": "Обменивай от 5000 шагов в день. На 7-й день — бонусные монеты."
+  },
+  "challenges": {
+    "steps": "шагов",
+    "reward": "Награда: {{coins}} монет",
+    "claimed": "Вы получили {{coins}} монет!",
+    "claim": "Забрать награду",
+    "done": "Награда получена",
+    "empty": "Нет активного челленджа"
+  },
+  "achievements": {
+    "locked": "Закрыто",
+    "unlocked": "Открыто",
+    "empty": "Достижений пока нет"
+  },
+  "friends": {
+    "email": "Email друга",
+    "add": "Добавить",
+    "empty": "Друзей пока нет"
+  },
+  "teams": {
+    "name": "Название команды",
+    "create": "Создать",
+    "createSection": "Новая команда",
+    "joinSection": "Вступить по коду",
+    "joinCode": "Код приглашения",
+    "join": "Вступить",
+    "code": "Код: {{code}}",
+    "empty": "Команд пока нет"
+  },
+  "boosts": {
+    "coins": "монет",
+    "buy": "Купить",
+    "bought": "Буст активен. Баланс: {{balance}}"
+  },
+  "premium": {
+    "title": "Премиум",
+    "perks": "+1 монета к дневному тиру, без лимита избранного 30 дней",
+    "perk1": "+1 монета к каждому дневному обмену",
+    "perk2": "Без лимита избранных купонов 30 дней",
+    "coinsFor30": "монет / 30 дней",
+    "activeUntil": "Активен до {{date}}",
+    "buy": "Активировать",
+    "bought": "Премиум до {{date}}"
+  },
+  "favorites": {
+    "empty": "Избранного пока нет — сохраняйте купоны в магазине"
+  },
+  "notifications": {
+    "settingsTitle": "Уведомления",
+    "evening": "Вечернее напоминание",
+    "eveningHint": "Сколько шагов осталось до 5000",
+    "claim": "Напомнить забрать монеты",
+    "claimHint": "Если есть незабранные монеты за день"
   }
 }

@@ -1,0 +1,22 @@
+appId: com.walkpoint.app
+---
+- launchApp
+- assertVisible: "WalkPoint"
+- tapOn:
+    text: "Log In"
+    optional: true
+- tapOn:
+    id: "email"
+    optional: true
+- inputText: "alice@example.com"
+    optional: true
+- tapOn:
+    id: "password"
+    optional: true
+- inputText: "testpass123"
+    optional: true
+- tapOn: "Log In"
+    optional: true
+- assertVisible:
+    text: "Steps"
+    optional: true

@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { setAppLanguage } from '../i18n/config';
+import { getEconomyRules } from '../services/apiService';
 
 export default function AccountScreen() {
   const { t, i18n } = useTranslation();
@@ -41,6 +42,7 @@ export default function AccountScreen() {
   } = useApp();
   const { user, logout, refreshProfile } = useAuth();
   const [converting, setConverting] = useState(false);
+  const [economy, setEconomy] = useState(null);
 
   const appVersion =
     Constants.expoConfig?.version ?? Constants.manifest?.version ?? '1.0.0';
@@ -49,6 +51,9 @@ export default function AccountScreen() {
     useCallback(() => {
       void refreshWallet?.();
       void refreshProfile?.();
+      void getEconomyRules()
+        .then(setEconomy)
+        .catch(() => setEconomy(null));
     }, [refreshWallet, refreshProfile]),
   );
 
@@ -105,10 +110,7 @@ export default function AccountScreen() {
   };
 
   const handleNotifications = () => {
-    Alert.alert(t('account.notificationsTitle'), t('account.notificationsMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('account.openSettings'), onPress: () => Linking.openSettings().catch(() => {}) },
-    ]);
+    navigation.navigate('NotificationSettings');
   };
 
   const handleAbout = () => {
@@ -163,6 +165,11 @@ export default function AccountScreen() {
           </View>
           <Text style={styles.userName}>{displayName}</Text>
           <Text style={styles.userEmail}>{displayEmail}</Text>
+          {user?.referral_code ? (
+            <Text style={styles.referralCode}>
+              {t('account.referralCode', { code: user.referral_code })}
+            </Text>
+          ) : null}
         </View>
 
         {/* Wallet + Steps Summary */}
@@ -181,6 +188,16 @@ export default function AccountScreen() {
             <Text style={styles.statLabel}>{t('account.totalTime')}</Text>
           </View>
         </View>
+
+        {economy ? (
+          <Text style={styles.economyHint}>
+            {t('account.economyHint', {
+              min: economy.min_steps_to_convert,
+              base: economy.daily_base_coins ?? economy.coins_at_min_steps,
+              window: economy.convert_window_days ?? 7,
+            })}
+          </Text>
+        ) : null}
 
         {/* Convert Steps Button */}
         <Pressable
@@ -203,6 +220,13 @@ export default function AccountScreen() {
         {/* Menu Items */}
         <View style={styles.menuSection}>
           <Pressable
+            style={[styles.menuItem, styles.menuItemFeatured]}
+            onPress={() => navigation.navigate('Features')}
+          >
+            <Text style={styles.menuItemFeaturedText}>{t('account.features')}</Text>
+            <ChevronRight size={20} color="#8140F3" strokeWidth={2} />
+          </Pressable>
+          <Pressable
             style={styles.menuItem}
             onPress={() => navigation.navigate('HowToConnectSteps')}
           >
@@ -213,6 +237,22 @@ export default function AccountScreen() {
             <Text style={styles.menuItemText}>{t('account.bodyProfile')}</Text>
             <ChevronRight size={20} color="#999999" strokeWidth={2} />
           </Pressable>
+          <Pressable
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Transactions')}
+          >
+            <Text style={styles.menuItemText}>{t('account.transactions')}</Text>
+            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+          </Pressable>
+          {user?.role === 'PARTNER' ? (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('PartnerHub')}
+            >
+              <Text style={styles.menuItemText}>{t('account.partnerHub')}</Text>
+              <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            </Pressable>
+          ) : null}
           <Pressable style={styles.menuItem} onPress={handleLanguage}>
             <Text style={styles.menuItemText}>
               {t('account.language')} ({i18n.language === 'ru' ? 'RU' : 'EN'})
@@ -334,6 +374,12 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontWeight: '500',
   },
+  referralCode: {
+    fontSize: 13,
+    color: '#8140F3',
+    fontWeight: '600',
+    marginTop: 8,
+  },
   statsSection: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -363,6 +409,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
     fontWeight: '500',
+  },
+  economyHint: {
+    marginHorizontal: 24,
+    marginBottom: 12,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   convertButton: {
     flexDirection: 'row',
@@ -414,6 +468,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000000',
     fontWeight: '600',
+  },
+  menuItemFeatured: {
+    backgroundColor: '#F3E8FF',
+    borderBottomColor: '#E9D5FF',
+  },
+  menuItemFeaturedText: {
+    fontSize: 16,
+    color: '#6B2FD9',
+    fontWeight: '700',
   },
   logoutItem: {
     borderBottomWidth: 0,

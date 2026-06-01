@@ -1,6 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { stepConvertAuthFields } from '../utils/stepSignature';
 
-const API_BASE_URL = 'https://walkpoint-backend.onrender.com/api';
+const PROD_API = 'https://walkpoint-backend.onrender.com/api';
+
+const DEV_API_HOST = '192.168.0.165';
+
+const API_BASE_URL = __DEV__
+  ? Platform.select({
+      web: 'http://127.0.0.1:8000/api',
+      android: `http://${DEV_API_HOST}:8000/api`,
+      default: 'http://127.0.0.1:8000/api',
+    })
+  : PROD_API;
 
 const TOKENS_KEY = 'auth_tokens';
 
@@ -80,11 +92,13 @@ export const login = async (email, password) => {
   return data;
 };
 
-export const register = async ({ email, password, first_name, last_name }) => {
+export const register = async ({ email, password, first_name, last_name, referral_code }) => {
+  const body = { email, password, first_name, last_name };
+  if (referral_code?.trim()) body.referral_code = referral_code.trim();
   const res = await fetch(`${API_BASE_URL}/users/register/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, first_name, last_name }),
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -124,6 +138,13 @@ export const updateProfile = async (data) => {
 /** @param {number | Record<string, unknown>} payload - steps only, or full body for convert */
 export const convertSteps = async (payload) => {
   const body = typeof payload === 'number' ? { steps: payload } : { ...payload };
+  const steps = Math.floor(body.steps ?? 0);
+  if (steps > 0) {
+    try {
+      const auth = await stepConvertAuthFields(steps);
+      Object.assign(body, auth);
+    } catch (_) {}
+  }
   const res = await apiFetch('/activity/convert/', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -145,6 +166,12 @@ export const syncActivity = async (body) => {
 };
 
 /** @param {string} [date] - YYYY-MM-DD local calendar day (recommended for mobile) */
+export const getEconomyRules = async () => {
+  const res = await apiFetch('/activity/economy/');
+  if (!res.ok) throw new Error('Failed to load economy rules');
+  return res.json();
+};
+
 export const getTodayStat = async (date) => {
   const params = new URLSearchParams();
   if (date) params.set('date', date);
@@ -228,4 +255,203 @@ export const getLeaderboard = async () => {
   const res = await apiFetch('/partners/leaderboard/');
   if (!res.ok) throw new Error('Failed to load leaderboard');
   return res.json();
+};
+
+export const getPartnerProfile = async () => {
+  const res = await apiFetch('/partners/profile/');
+  if (!res.ok) throw new Error('Failed to load partner profile');
+  return res.json();
+};
+
+export const updatePartnerProfile = async (data) => {
+  const res = await apiFetch('/partners/profile/', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update partner profile');
+  return res.json();
+};
+
+export const createStory = async (data) => {
+  const res = await apiFetch('/partners/stories/create/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Failed to create story');
+  return json;
+};
+
+export const createCouponTemplate = async (data) => {
+  const res = await apiFetch('/market/templates/create/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Failed to create coupon');
+  return json;
+};
+
+export const redeemCouponByCode = async (uniqueCode) => {
+  const res = await apiFetch('/market/redeem/', {
+    method: 'POST',
+    body: JSON.stringify({ unique_code: uniqueCode }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Redeem failed');
+  return json;
+};
+
+export const getCouponsByCategory = async (category) => {
+  const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+  const res = await apiFetch(`/market${qs}`);
+  if (!res.ok) throw new Error('Failed to load coupons');
+  return res.json();
+};
+
+export const getFavoriteCoupons = async () => {
+  const res = await apiFetch('/market/favorites/');
+  if (!res.ok) throw new Error('Failed to load favorites');
+  return res.json();
+};
+
+export const toggleFavoriteCoupon = async (templateId) => {
+  const res = await apiFetch('/market/favorites/toggle/', {
+    method: 'POST',
+    body: JSON.stringify({ template_id: templateId }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Failed');
+  return {
+    ...json,
+    is_favorite: json.favorited ?? json.is_favorite ?? false,
+  };
+};
+
+export const requestPasswordReset = async (email) => {
+  const res = await fetch(`${API_BASE_URL}/users/password-reset/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return res.json();
+};
+
+export const confirmPasswordReset = async (uid, token, password) => {
+  const res = await fetch(`${API_BASE_URL}/users/password-reset/confirm/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, token, password }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Reset failed');
+  return json;
+};
+
+export const getStreak = async () => {
+  const res = await apiFetch('/engagement/streak/');
+  if (!res.ok) throw new Error('Failed to load streak');
+  return res.json();
+};
+
+export const getActiveChallenge = async () => {
+  const res = await apiFetch('/challenges/active/');
+  if (!res.ok) throw new Error('Failed to load challenge');
+  return res.json();
+};
+
+export const claimChallenge = async () => {
+  const res = await apiFetch('/challenges/claim/', { method: 'POST', body: '{}' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Claim failed');
+  return json;
+};
+
+export const getAchievements = async () => {
+  const res = await apiFetch('/challenges/achievements/');
+  if (!res.ok) throw new Error('Failed to load achievements');
+  return res.json();
+};
+
+export const getFriends = async () => {
+  const res = await apiFetch('/social/friends/');
+  if (!res.ok) throw new Error('Failed to load friends');
+  return res.json();
+};
+
+export const addFriend = async (email) => {
+  const res = await apiFetch('/social/friends/', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Failed');
+  return json;
+};
+
+export const getFriendsLeaderboard = async () => {
+  const res = await apiFetch('/social/friends/leaderboard/');
+  if (!res.ok) throw new Error('Failed to load friends leaderboard');
+  return res.json();
+};
+
+export const getTeams = async () => {
+  const res = await apiFetch('/social/teams/');
+  if (!res.ok) throw new Error('Failed to load teams');
+  return res.json();
+};
+
+export const createTeam = async (name) => {
+  const res = await apiFetch('/social/teams/', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Failed');
+  return json;
+};
+
+export const joinTeam = async (inviteCode) => {
+  const res = await apiFetch('/social/teams/join/', {
+    method: 'POST',
+    body: JSON.stringify({ invite_code: inviteCode }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Failed');
+  return json;
+};
+
+export const getTeamLeaderboard = async (teamId) => {
+  const res = await apiFetch(`/social/teams/${teamId}/leaderboard/`);
+  if (!res.ok) throw new Error('Failed to load team leaderboard');
+  return res.json();
+};
+
+export const getBoosts = async () => {
+  const res = await apiFetch('/shop/boosts/');
+  if (!res.ok) throw new Error('Failed to load boosts');
+  return res.json();
+};
+
+export const buyBoost = async (slug) => {
+  const res = await apiFetch('/shop/boosts/buy/', {
+    method: 'POST',
+    body: JSON.stringify({ slug }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Purchase failed');
+  return json;
+};
+
+export const getPremiumStatus = async () => {
+  const res = await apiFetch('/shop/premium/');
+  if (!res.ok) throw new Error('Failed to load premium');
+  return res.json();
+};
+
+export const buyPremium = async () => {
+  const res = await apiFetch('/shop/premium/', { method: 'POST', body: '{}' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.detail || 'Purchase failed');
+  return json;
 };

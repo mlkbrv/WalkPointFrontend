@@ -41,7 +41,13 @@
     "logInBold": "Log In",
     "fillRequired": "Please fill in all required fields.",
     "passwordMin": "Password must be at least 8 characters.",
-    "registrationFailed": "Registration failed"
+    "registrationFailed": "Registration failed",
+    "referralCode": "Referral code (optional)",
+    "forgotPassword": "Forgot password?",
+    "resetEmailSent": "If that email exists, reset instructions were sent.",
+    "resetDone": "Password updated. You can log in.",
+    "resetTitle": "Reset password",
+    "resetConfirm": "Confirm reset"
   },
   "appError": {
     "title": "Something went wrong. Please restart the app.",
@@ -99,7 +105,11 @@
     "coinsEarnedTitle": "Coins earned!",
     "coinsEarnedMessage": "You earned {{amount}} coins.\nNew balance: {{balance}}",
     "noStories": "No stories available",
+    "storiesUnavailable": "Couldn't load stories. Pull to refresh or try again later.",
     "steps": "Steps",
+    "goalLabel": "Goal {{goal}}",
+    "coinsPreview": "{{coins}} coins · {{left}} to 5k",
+    "quickMore": "More features",
     "time": "time",
     "kcal": "kcal",
     "km": "km",
@@ -113,6 +123,8 @@
     "subtitleIos": "WalkPoint reads steps, weight, and height from the Health app for more accurate daily calories.\n\nTap “Allow access” — in the system sheet, turn on steps, weight, and height for WalkPoint.",
     "subtitleAndroid": "WalkPoint gets steps, weight, and height from Health Connect.\n\nFirst open Health Connect (button below), then tap “Connect steps” — choose WalkPoint and allow steps (and weight/height if offered).",
     "openHc": "Open Health Connect",
+    "usePhoneSensor": "Use phone step sensor only",
+    "usePhoneSensorHint": "Counts steps in the background without Health Connect (hardware sensor required).",
     "connectSteps": "Connect steps",
     "allowAccess": "Allow access",
     "hintIos": "If the sheet doesn't appear: Settings → Privacy → Health → Data Access → WalkPoint.",
@@ -158,6 +170,7 @@
     "totalSteps": "Total Steps",
     "totalTime": "Total Time",
     "convertSteps": "Convert {{count}} steps to coins",
+    "economyHint": "From {{min}} steps: {{base}} coins, +1 per 1000 more. Past days: {{window}} days. Auto-convert at midnight if ≥{{min}} steps.",
     "howToSteps": "How to connect steps",
     "bodyProfile": "Weight & height",
     "settings": "Settings",
@@ -187,14 +200,63 @@
     "openSettings": "Open settings",
     "aboutMessage": "WalkPoint\nVersion {{version}}",
     "moreMenuTitle": "Account menu",
-    "moreRefresh": "Refresh data"
+    "moreRefresh": "Refresh data",
+    "referralCode": "Your referral code: {{code}}",
+    "transactions": "Transaction history",
+    "partnerHub": "Partner dashboard",
+    "features": "More features",
+    "stepGoal": "Daily step goal",
+    "stepGoalSaved": "Step goal saved",
+    "stepGoalInvalid": "Enter a goal between 1,000 and 100,000 steps"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "empty": "No transactions yet",
+    "loadFailed": "Could not load transactions",
+    "typeSteps": "Steps converted",
+    "typeStory": "Story reward",
+    "typeCoupon": "Coupon purchase",
+    "typeReferral": "Referral reward",
+    "typeOther": "Transaction"
+  },
+  "partnerHub": {
+    "title": "Partner dashboard",
+    "profileSection": "Brand profile",
+    "brandName": "Brand name",
+    "description": "Description",
+    "saveProfile": "Save profile",
+    "profileSaved": "Profile updated",
+    "storySection": "New story",
+    "storyUrl": "Media URL",
+    "storyReward": "Reward (coins)",
+    "createStory": "Publish story",
+    "storyCreated": "Story created",
+    "storyUrlRequired": "Enter a media URL",
+    "couponSection": "New coupon",
+    "couponTitle": "Title",
+    "couponDesc": "Description",
+    "couponPrice": "Price (coins)",
+    "couponQty": "Quantity",
+    "createCoupon": "Create coupon",
+    "couponCreated": "Coupon created",
+    "couponTitleRequired": "Enter a coupon title",
+    "redeemSection": "Redeem coupon",
+    "redeemCode": "QR / coupon code",
+    "redeem": "Redeem",
+    "redeemed": "Coupon redeemed",
+    "scanQr": "Scan QR code"
   },
   "market": {
     "title": "Coupon Store",
     "empty": "No coupons available yet",
     "stepsPrice": "{{steps}} steps",
     "coinsShort": "{{coins}}c",
-    "offerFallback": "Offer"
+    "offerFallback": "Offer",
+    "categoryAll": "All",
+    "categoryFood": "Food",
+    "categorySport": "Sport",
+    "categoryBeauty": "Beauty",
+    "categoryOther": "Other"
   },
   "myCoupons": {
     "title": "My Coupons",
@@ -215,7 +277,9 @@
     "usageTitle": "Usage instructions",
     "usageText": "Show this screen or QR code at checkout. Staff may ask for the PIN or scan the code.",
     "shareMessage": "{{title}} – {{partner}}\nCode: {{code}}\nValid until: {{date}}",
-    "shareTitle": "{{partner}} coupon"
+    "shareTitle": "{{partner}} coupon",
+    "favorited": "Added to favorites",
+    "unfavorited": "Removed from favorites"
   },
   "couponRedeem": {
     "insufficientTitle": "Insufficient balance",
@@ -235,6 +299,10 @@
     "totalStepsCaption": "Total steps all time.",
     "statistics": "Statistics",
     "thisWeek": "This Week",
+    "prevWeek": "Previous week",
+    "nextWeek": "Next week",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
     "yourProgress": "Your Progress",
     "thisMonth": "This Month",
     "allHistory": "All History",
@@ -244,24 +312,118 @@
       "Time": "Time",
       "Calorie": "Calories",
       "Distance": "Distance"
-    }
+    },
+    "potentialCoins": "Potential: {{coins}} coins",
+    "claimCoins": "Claim coins",
+    "claimMinSteps": "At least 5,000 steps required",
+    "alreadyConverted": "Already converted for this day",
+    "claimed": "Earned {{coins}} coins. Balance: {{balance}}"
   },
   "history": {
     "title": "History",
     "today": "Today",
     "yesterday": "Yesterday",
     "empty": "No tracking history yet",
-    "emptySub": "Start tracking your activities to see them here.",
+    "emptySub": "Saved daily steps and route sessions appear here after you walk or finish a track.",
+    "routeSession": "GPS route",
+    "detailTitle": "Activity details",
     "steps": "steps",
     "time": "time",
     "kcal": "kcal",
     "km": "km"
+  },
+  "nativeSteps": {
+    "interruptTitle": "Tracking paused",
+    "interruptMessage": "Step counting in the background stopped (app was closed or removed from recent apps). Open the app to resume counting."
   },
   "scoreboard": {
     "title": "Weekly scoreboard",
     "you": "You",
     "youAre": "You are #{{rank}}",
     "above": "Above: {{name}} ({{score}})",
-    "below": "Below: {{name}} ({{score}})"
+    "below": "Below: {{name}} ({{score}})",
+    "tabGlobal": "Global",
+    "tabFriends": "Friends",
+    "tabTeam": "Team",
+    "teamEmpty": "Join or create a team to see the team leaderboard.",
+    "joinTeam": "Open teams"
+  },
+  "features": {
+    "title": "More",
+    "heroTitle": "Explore WalkPoint",
+    "heroSub": "Streaks, challenges, friends, boosts, and more.",
+    "sectionProgress": "Progress",
+    "sectionSocial": "Social",
+    "sectionShop": "Rewards",
+    "sectionAccount": "Account",
+    "streaks": "Streaks",
+    "challenges": "Challenges",
+    "achievements": "Achievements",
+    "friends": "Friends",
+    "teams": "Teams",
+    "favorites": "Favorites",
+    "boosts": "Boost shop",
+    "premium": "Premium",
+    "transactions": "Transactions",
+    "partner": "Partner hub"
+  },
+  "streaks": {
+    "daysInRow": "days in a row",
+    "lastDay": "Last qualified: {{date}}",
+    "tipTitle": "Keep the flame alive",
+    "tipBody": "Convert at least 5,000 steps each day to grow your streak. Day 7 earns bonus coins."
+  },
+  "challenges": {
+    "steps": "steps",
+    "reward": "Reward: {{coins}} coins",
+    "claimed": "You earned {{coins}} coins!",
+    "claim": "Claim reward",
+    "done": "Reward claimed",
+    "empty": "No active challenge"
+  },
+  "achievements": {
+    "locked": "Locked",
+    "unlocked": "Unlocked",
+    "empty": "No achievements yet"
+  },
+  "friends": {
+    "email": "Friend email",
+    "add": "Add friend",
+    "empty": "No friends yet"
+  },
+  "teams": {
+    "name": "Team name",
+    "create": "Create team",
+    "createSection": "New team",
+    "joinSection": "Join with code",
+    "joinCode": "Invite code",
+    "join": "Join team",
+    "code": "Code: {{code}}",
+    "empty": "No teams yet"
+  },
+  "boosts": {
+    "coins": "coins",
+    "buy": "Buy",
+    "bought": "Boost active. Balance: {{balance}}"
+  },
+  "premium": {
+    "title": "Premium status",
+    "perks": "+1 coin on daily tier, unlimited favorites for 30 days",
+    "perk1": "+1 bonus coin on each daily conversion",
+    "perk2": "Unlimited favorite coupons for 30 days",
+    "coinsFor30": "coins / 30 days",
+    "activeUntil": "Active until {{date}}",
+    "buy": "Activate",
+    "bought": "Premium active until {{date}}"
+  },
+  "favorites": {
+    "empty": "No favorites yet — save coupons from the store"
+  },
+  "notifications": {
+    "settingsTitle": "Notifications",
+    "evening": "Evening step reminder",
+    "eveningHint": "Remind you how many steps left to reach 5,000",
+    "claim": "Remind to claim coins",
+    "claimHint": "Notify when you have unclaimed coins for the day"
   }
 }

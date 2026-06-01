@@ -48,7 +48,7 @@
       "package": "com.walkpoint.app"
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "splash": {
@@ -71,7 +71,6 @@
           }
         }
       ],
-      "expo-router",
       [
         "expo-sensors",
         {
@@ -108,7 +107,12 @@
         }
       ],
       "expo-font",
-      "expo-image",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "WalkPoint uses the camera to scan coupon QR codes for partners."
+        }
+      ],
       [
         "expo-build-properties",
         {
@@ -121,7 +125,7 @@
       ]
     ],
     "extra": {
-      "router": {},
+      "stepHmacSecret": "walkpoint-hmac-secret-change-me",
       "eas": {
         "projectId": "29701a41-d8cc-46a5-b214-45306364566f"
       }

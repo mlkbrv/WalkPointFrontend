@@ -10,13 +10,17 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { getLeaderboard } from '../services/apiService';
+import { getFriendsLeaderboard, getLeaderboard, getTeamLeaderboard, getTeams } from '../services/apiService';
 
 function ScoreboardScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { user } = useAuth();
+  const [tab, setTab] = useState('global');
+  const [teamId, setTeamId] = useState(null);
   const [users, setUsers] = useState([]);
   const [currentUserRank, setCurrentUserRank] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,8 +31,28 @@ function ScoreboardScreen() {
   });
 
   const fetchLeaderboard = useCallback(async () => {
+    setLoading(true);
     try {
-      const data = await getLeaderboard();
+      let data;
+      if (tab === 'friends') {
+        data = await getFriendsLeaderboard();
+      } else if (tab === 'team') {
+        let tid = teamId;
+        if (!tid) {
+          const teams = await getTeams();
+          const first = Array.isArray(teams) ? teams[0] : null;
+          tid = first?.id ?? null;
+          if (tid) setTeamId(tid);
+        }
+        if (!tid) {
+          setUsers([]);
+          setCurrentUserRank(null);
+          return;
+        }
+        data = await getTeamLeaderboard(tid);
+      } else {
+        data = await getLeaderboard();
+      }
       const entries = (Array.isArray(data) ? data : data.results || []).map((entry) => ({
         id: entry.user_id,
         name: [entry.first_name, entry.last_name].filter(Boolean).join(' ') || t('account.userFallback'),
@@ -76,7 +100,7 @@ function ScoreboardScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user, t]);
+  }, [user, t, tab, teamId]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -85,6 +109,7 @@ function ScoreboardScreen() {
   const topThree = users.slice(0, 3);
   const currentUser = users.find((u) => u.isCurrentUser);
   const isInTopThree = currentUserRank && currentUserRank <= 3;
+  const teamEmpty = tab === 'team' && users.length === 0;
 
   if (loading) {
     return (
@@ -107,7 +132,32 @@ function ScoreboardScreen() {
           <View style={styles.placeholder} />
         </View>
 
-        {/* Top Three Podium */}
+        <View style={styles.tabsRow}>
+          {['global', 'friends', 'team'].map((key) => (
+            <Pressable
+              key={key}
+              style={[styles.tabBtn, tab === key && styles.tabBtnActive]}
+              onPress={() => setTab(key)}
+            >
+              <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>
+                {t(`scoreboard.tab${key.charAt(0).toUpperCase()}${key.slice(1)}`)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {teamEmpty ? (
+          <View style={styles.teamEmpty}>
+            <Text style={styles.teamEmptyText}>{t('scoreboard.teamEmpty')}</Text>
+            <Pressable
+              style={styles.teamEmptyBtn}
+              onPress={() => navigation.navigate('Account', { screen: 'Teams' })}
+            >
+              <Text style={styles.teamEmptyBtnText}>{t('scoreboard.joinTeam')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+        <>
         <View style={styles.podiumContainer}>
           {topThree.length >= 2 && (
             <Animated.View
@@ -274,7 +324,6 @@ function ScoreboardScreen() {
           </View>
         )}
 
-        {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <Pressable style={styles.saveButton}>
             <Save size={20} color="#8140F3" strokeWidth={2} />
@@ -285,6 +334,8 @@ function ScoreboardScreen() {
             <Text style={styles.shareButtonText}>{t('common.share')}</Text>
           </Pressable>
         </View>
+        </>
+        )}
       </ScrollView>
     </View>
   );
@@ -322,6 +373,50 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 30,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  tabBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+  },
+  tabBtnActive: {
+    backgroundColor: '#8140F3',
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#FFF',
+  },
+  teamEmpty: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  teamEmptyText: {
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: 15,
+    marginBottom: 16,
+  },
+  teamEmptyBtn: {
+    backgroundColor: '#8140F3',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  teamEmptyBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
   },
   podiumContainer: {
     flexDirection: 'row',

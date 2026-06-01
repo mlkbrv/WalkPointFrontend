@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { AlertCircle, Clock, Coins, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,15 +10,20 @@ import {
   Linking,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import DeviceInfo from 'react-native-device-info';
+import * as Device from 'expo-device';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { getStories, viewStory } from '../services/apiService';
+import { getDateKey } from '../utils/calculations';
+import { tierCoinsForSteps, stepsToReachMin } from '../utils/tierCoins';
+import { scheduleDailyReminders } from '../services/notificationService';
 import { clearGoogleFitDeniedCooldown } from '../services/googleFitSteps';
 import i18nInstance from '../i18n/config';
 
@@ -28,12 +34,15 @@ const GOOGLE_FIT_PLAY_URL = `https://play.google.com/store/apps/details?id=${GOO
 
 function HomeScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const {
     dailyStats,
     weeklyProgress,
     updateWeeklyProgress,
+    loadWeeklyProgress,
     walletBalance,
     refreshWallet,
+    syncStepsFromSystem,
     useHealthConnect,
     healthConnectAvailable,
     healthConnectReady,
@@ -41,11 +50,13 @@ function HomeScreen() {
     openHealthConnectSettings,
     openSamsungHealth,
   } = useApp();
+  const { user } = useAuth();
 
   const safeDailyStats = dailyStats ?? { steps: 0, time: 0, calories: 0, distance: 0 };
   const isSamsungDevice =
     Platform.OS === 'android' &&
-    DeviceInfo.getManufacturerSync().toLowerCase() === 'samsung';
+    (Device.manufacturer?.toLowerCase() === 'samsung' ||
+      Device.brand?.toLowerCase() === 'samsung');
   const showHealthConnectBanner =
     (Platform.OS === 'android' || Platform.OS === 'ios') &&
     useHealthConnect &&
@@ -60,42 +71,53 @@ function HomeScreen() {
 
   // Step counting is started once when MainTabs mount (see App.jsx).
 
-  const [goal] = useState(16000);
+  const goal = user?.step_goal ?? 10000;
   const [stories, setStories] = useState([]);
   const [storiesLoading, setStoriesLoading] = useState(true);
+  const [storiesError, setStoriesError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    void scheduleDailyReminders(safeDailyStats.steps, safeDailyStats.isConverted);
+  }, [safeDailyStats.steps, safeDailyStats.isConverted]);
 
   const fetchStories = useCallback(async () => {
+    setStoriesError(false);
+    setStoriesLoading(true);
     try {
       const data = await getStories();
       setStories(Array.isArray(data) ? data : data.results || []);
     } catch {
-      // offline
+      setStories([]);
+      setStoriesError(true);
     } finally {
       setStoriesLoading(false);
     }
   }, []);
 
+  const onHomeRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchStories(),
+        refreshWallet?.(),
+        syncStepsFromSystem?.(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchStories, refreshWallet, syncStepsFromSystem]);
+
   useEffect(() => {
     fetchStories();
   }, [fetchStories]);
 
-  useEffect(() => {
-    if (weeklyProgress.length === 0) {
-      const localeTag = i18nInstance.language === 'ru' ? 'ru-RU' : 'en-US';
-      const today = new Date();
-      const week = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        week.push({
-          day: date.toLocaleDateString(localeTag, { weekday: 'short' }),
-          date: date.getDate(),
-          steps: i === 0 ? safeDailyStats.steps : 0,
-        });
-      }
-      updateWeeklyProgress(week);
-    }
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      void syncStepsFromSystem?.();
+      void loadWeeklyProgress?.();
+    }, [syncStepsFromSystem, loadWeeklyProgress]),
+  );
 
   const openGoogleFit = useCallback(async () => {
     if (Platform.OS !== 'android') return;
@@ -125,7 +147,7 @@ function HomeScreen() {
       refreshWallet();
       fetchStories();
     } catch (e) {
-      Alert.alert(t('common.info'), e.message);
+      Alert.alert(t('common.info'), String(e?.message ?? e));
     }
   };
 
@@ -139,11 +161,21 @@ function HomeScreen() {
   const currentDay = today.getDay();
   const adjustedDay = currentDay === 0 ? 6 : currentDay - 1;
 
+  const getWeekDayDate = (index) => {
+    const dayDate = new Date(today);
+    dayDate.setDate(today.getDate() - adjustedDay + index);
+    return dayDate;
+  };
+
   const getWeekDayProgress = (index) => {
-    const dayData = weeklyProgress.find(
-      (w) => w.date === new Date(today.getTime() - (adjustedDay - index) * 24 * 60 * 60 * 1000).getDate()
-    );
+    const key = getDateKey(getWeekDayDate(index));
+    const dayData = weeklyProgress.find((w) => w.dateKey === key || w.date === getWeekDayDate(index).getDate());
     return dayData ? Math.min((dayData.steps / goal) * 100, 100) : 0;
+  };
+
+  const openReportDay = (index) => {
+    const key = getDateKey(getWeekDayDate(index));
+    navigation.navigate('Report', { screen: 'ReportMain', params: { focusDate: key } });
   };
 
   const storyColors = ['#FFC107', '#00A859', '#FF0000', '#2196F3', '#9C27B0', '#FF5722'];
@@ -151,7 +183,13 @@ function HomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onHomeRefresh} tintColor="#8140F3" />
+        }
+      >
         {/* Health Connect: show banner so user can open permission dialog (app will then appear in Health Connect) */}
         {showHealthConnectBanner && (
           <Pressable
@@ -170,10 +208,13 @@ function HomeScreen() {
             <Footprints size={24} color="#8140F3" />
           </View>
           <Text style={styles.headerTitle}>{t('tabs.home')}</Text>
-          <View style={styles.balanceBadge}>
+          <Pressable
+            style={styles.balanceBadge}
+            onPress={() => navigation.navigate('Account', { screen: 'Transactions' })}
+          >
             <Coins size={14} color="#8140F3" />
             <Text style={styles.balanceText}>{parseFloat(walletBalance).toFixed(0)}</Text>
-          </View>
+          </Pressable>
         </View>
 
         {/* Stories */}
@@ -184,6 +225,8 @@ function HomeScreen() {
         >
           {storiesLoading ? (
             <ActivityIndicator color="#8140F3" style={{ marginLeft: 20 }} />
+          ) : storiesError ? (
+            <Text style={styles.noStories}>{t('home.storiesUnavailable')}</Text>
           ) : stories.length > 0 ? (
             stories.map((story, idx) => {
               const color = storyColors[idx % storyColors.length];
@@ -264,11 +307,20 @@ function HomeScreen() {
                 transform={`rotate(-90 120 120)`}
               />
             </Svg>
-            <View style={styles.innerCircle}>
+            <Pressable style={styles.innerCircle} onPress={() => openReportDay(adjustedDay)}>
               <Text style={styles.stepNumber}>{safeDailyStats.steps}</Text>
               <Text style={styles.stepLabel}>{t('home.steps')}</Text>
-              <Text style={styles.goalText}>{goal.toLocaleString()}</Text>
-            </View>
+              <Text style={styles.goalText}>{t('home.goalLabel', { goal: goal.toLocaleString() })}</Text>
+              <View style={styles.coinsPill}>
+                <Coins size={14} color="#8140F3" strokeWidth={2.5} />
+                <Text style={styles.coinsPreview}>
+                  {t('home.coinsPreview', {
+                    coins: tierCoinsForSteps(safeDailyStats.steps),
+                    left: stepsToReachMin(safeDailyStats.steps),
+                  })}
+                </Text>
+              </View>
+            </Pressable>
           </View>
         </View>
 
@@ -335,7 +387,7 @@ function HomeScreen() {
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressTitle}>{t('home.yourProgress')}</Text>
-            <Pressable style={styles.weekSelector}>
+            <Pressable style={styles.weekSelector} onPress={() => navigation.navigate('Report')}>
               <Text style={styles.weekSelectorText}>{t('home.thisWeek')}</Text>
               <Text style={styles.weekSelectorArrow}>▼</Text>
             </Pressable>
@@ -343,15 +395,14 @@ function HomeScreen() {
           <View style={styles.weekContainer}>
             {weekDays.map((day, index) => {
               const isToday = index === adjustedDay;
-              const dayDate = new Date(today);
-              dayDate.setDate(today.getDate() - adjustedDay + index);
+              const dayDate = getWeekDayDate(index);
               const dayProgress = getWeekDayProgress(index);
               const dayRadius = 15;
               const dayCircumference = 2 * Math.PI * dayRadius;
               const dayStrokeDashoffset = dayCircumference - (dayProgress / 100) * dayCircumference;
 
               return (
-                <View key={index} style={styles.weekDay}>
+                <Pressable key={index} style={styles.weekDay} onPress={() => openReportDay(index)}>
                   <View style={styles.weekDayCircleWrapper}>
                     <Svg width={32} height={32} style={styles.weekDaySvg}>
                       <Circle
@@ -396,10 +447,25 @@ function HomeScreen() {
                   >
                     {day}
                   </Text>
-                </View>
+                </Pressable>
               );
             })}
           </View>
+        </View>
+
+        <View style={styles.quickRow}>
+          <Pressable style={styles.quickChip} onPress={() => navigation.navigate('Account', { screen: 'Features' })}>
+            <Text style={styles.quickChipText}>{t('home.quickMore')}</Text>
+          </Pressable>
+          <Pressable style={styles.quickChip} onPress={() => navigation.navigate('Scoreboard')}>
+            <Text style={styles.quickChipText}>{t('tabs.scoreboard')}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.quickChip}
+            onPress={() => navigation.navigate('Market', { screen: 'Favorites' })}
+          >
+            <Text style={styles.quickChipText}>{t('features.favorites')}</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>
@@ -564,6 +630,23 @@ const styles = StyleSheet.create({
     color: '#999999',
     fontWeight: '400',
   },
+  coinsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F3E8FF',
+    borderRadius: 20,
+    maxWidth: '95%',
+  },
+  coinsPreview: {
+    fontSize: 12,
+    color: '#6B2FD9',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   stepsNotShowingCard: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -634,6 +717,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666666',
     fontWeight: '500',
+  },
+  quickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+  },
+  quickChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E8EAEF',
+  },
+  quickChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B2FD9',
   },
   progressSection: {
     paddingHorizontal: 20,

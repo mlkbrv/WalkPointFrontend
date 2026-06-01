@@ -1,10 +1,13 @@
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { Clock, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Clock, Coins, Flame, Footprints, MapPin } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import {
-  Dimensions,
+  ActivityIndicator,
+  Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,88 +16,348 @@ import {
 } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useApp } from '../context/AppContext';
-
-const { width } = Dimensions.get('window');
+import { useAuth } from '../context/AuthContext';
+import { saveLocalDailyStat } from '../services/activitySync';
+import { convertSteps, getTodayStat, syncActivity } from '../services/apiService';
+import {
+  calculateDistanceFromSteps,
+  calculateWalkingCaloriesFromSteps,
+  getDateKey,
+} from '../utils/calculations';
+import { tierCoinsForSteps } from '../utils/tierCoins';
 
 const METRIC_KEYS = ['Steps', 'Time', 'Calorie', 'Distance'];
 
-function ReportScreen() {
-  const { t } = useTranslation();
-  const { totalStats, trackingHistory, weeklyProgress } = useApp();
-  const navigation = useNavigation();
-  const [selectedMetric, setSelectedMetric] = useState('Steps');
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
 
+function formatTickValue(val, metric) {
+  if (!Number.isFinite(val) || val < 0) return '0';
+  switch (metric) {
+    case 'Steps':
+      return val >= 1000 ? `${(val / 1000).toFixed(val >= 10000 ? 0 : 1)}k` : String(Math.round(val));
+    case 'Time':
+      return String(Math.round(val));
+    case 'Calorie':
+      return String(Math.round(val));
+    case 'Distance':
+      return val >= 10 ? val.toFixed(0) : val.toFixed(1);
+    default:
+      return String(Math.round(val));
+  }
+}
+
+function ReportScreen() {
+  const { t, i18n } = useTranslation();
+  const { totalStats, bodyProfile, getHistoricalStats, syncActivityHistory, refreshWallet } = useApp();
+  const { user } = useAuth();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const pendingOpenDate = useRef(null);
+  const stepGoal = user?.step_goal ?? 10000;
+  const [selectedMetric, setSelectedMetric] = useState('Steps');
+  const [sheetDay, setSheetDay] = useState(null);
+  const [sheetStats, setSheetStats] = useState(null);
+  const [converting, setConverting] = useState(false);
+
+  const [weekWindowEnd, setWeekWindowEnd] = useState(() => startOfDay(new Date()));
+  const [weekBars, setWeekBars] = useState([]);
+  const [weekLoading, setWeekLoading] = useState(true);
+
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [monthDaySteps, setMonthDaySteps] = useState({});
+  const [monthLoading, setMonthLoading] = useState(true);
+
+  const localeTag = i18n.language?.startsWith('ru') ? 'ru-RU' : 'en-US';
   const calendarWeekdays = useMemo(() => t('report.calendarWeekdays', { returnObjects: true }), [t]);
 
-  // Calculate weekly stats for chart
-  const weekData = weeklyProgress.length > 0 
-    ? weeklyProgress 
-    : Array.from({ length: 7 }, (_, i) => ({
-        day: i + 1,
-        steps: Math.floor(Math.random() * 5000) + 2000,
-      }));
+  const loadWeekBars = useCallback(async () => {
+    setWeekLoading(true);
+    const days = [];
+    const end = startOfDay(weekWindowEnd);
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(end);
+      date.setDate(date.getDate() - i);
+      let steps = 0;
+      try {
+        const stats = await getHistoricalStats(date);
+        steps = stats?.steps ?? 0;
+      } catch {
+        steps = 0;
+      }
+      days.push({
+        day: date.toLocaleDateString(localeTag, { weekday: 'short' }),
+        dateNum: date.getDate(),
+        dateKey: getDateKey(date),
+        steps,
+      });
+    }
+    setWeekBars(days);
+    setWeekLoading(false);
+  }, [weekWindowEnd, getHistoricalStats, localeTag]);
+
+  const weekRangeLabel = useMemo(() => {
+    const end = startOfDay(weekWindowEnd);
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    const sameYear = start.getFullYear() === end.getFullYear();
+    const optsShort = { month: 'short', day: 'numeric' };
+    const startStr = start.toLocaleDateString(localeTag, sameYear ? optsShort : { ...optsShort, year: 'numeric' });
+    const endStr = end.toLocaleDateString(localeTag, { ...optsShort, year: 'numeric' });
+    return `${startStr} – ${endStr}`;
+  }, [weekWindowEnd, localeTag]);
+
+  const todayStart = startOfDay(new Date());
+  const canGoNextWeek = weekWindowEnd < todayStart;
+
+  const goPrevWeek = () => {
+    setWeekWindowEnd((prev) => {
+      const n = startOfDay(prev);
+      n.setDate(n.getDate() - 7);
+      return n;
+    });
+  };
+
+  const goNextWeek = () => {
+    if (!canGoNextWeek) return;
+    setWeekWindowEnd((prev) => {
+      const n = startOfDay(prev);
+      n.setDate(n.getDate() + 7);
+      return n > todayStart ? todayStart : n;
+    });
+  };
 
   const getMetricValue = (day, metric) => {
+    const steps = day.steps || 0;
+    const w = bodyProfile?.weightKg ?? 75;
+    const h = bodyProfile?.heightCm ?? null;
     switch (metric) {
       case 'Steps':
-        return day.steps || 0;
+        return steps;
       case 'Time':
-        return Math.floor((day.steps || 0) * 0.05);
+        return Math.round(steps / 100);
       case 'Calorie':
-        return Math.floor((day.steps || 0) * 0.04);
+        return calculateWalkingCaloriesFromSteps(steps, w, h);
       case 'Distance':
-        return Math.round(((day.steps || 0) * 0.0008) * 100) / 100;
+        return calculateDistanceFromSteps(steps, h);
       default:
-        return day.steps || 0;
+        return steps;
     }
   };
 
-  // Normalize values for chart (max height 150)
-  const allValues = weekData.map((day) => getMetricValue(day, selectedMetric));
+  const allValues = weekBars.map((day) => getMetricValue(day, selectedMetric));
   const maxValue = Math.max(...allValues, 1);
-  const normalizedMax = selectedMetric === 'Steps' ? 7000 : 
-                        selectedMetric === 'Time' ? 350 : 
-                        selectedMetric === 'Calorie' ? 280 : 5.6;
-  const chartMax = Math.max(maxValue, normalizedMax * 0.1);
+  const chartMax = Math.max(maxValue * 1.05, 1);
 
-  // Calendar data
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const yAxisTicks = useMemo(() => {
+    const m = chartMax;
+    return [m, (m * 3) / 4, m / 2, m / 4].map((v) => Math.max(0, v));
+  }, [chartMax]);
 
-  // Calculate calendar day progress
+  const todayKey = getDateKey(new Date());
+
+  const displayYear = calendarMonth.getFullYear();
+  const displayMonthIndex = calendarMonth.getMonth();
+  const firstDay = new Date(displayYear, displayMonthIndex, 1).getDay();
+  const daysInMonth = new Date(displayYear, displayMonthIndex + 1, 0).getDate();
+
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const canGoNextMonth =
+    calendarMonth.getFullYear() < currentMonthStart.getFullYear() ||
+    (calendarMonth.getFullYear() === currentMonthStart.getFullYear() &&
+      calendarMonth.getMonth() < currentMonthStart.getMonth());
+
+  const loadMonthSteps = useCallback(async () => {
+    setMonthLoading(true);
+    const next = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(displayYear, displayMonthIndex, d);
+      try {
+        const stats = await getHistoricalStats(dt);
+        next[d] = stats?.steps ?? 0;
+      } catch {
+        next[d] = 0;
+      }
+    }
+    setMonthDaySteps(next);
+    setMonthLoading(false);
+  }, [displayYear, displayMonthIndex, daysInMonth, getHistoricalStats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        await syncActivityHistory?.();
+        if (cancelled) return;
+        await loadWeekBars();
+        await loadMonthSteps();
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [syncActivityHistory, loadWeekBars, loadMonthSteps]),
+  );
+
+  useEffect(() => {
+    loadMonthSteps();
+  }, [loadMonthSteps]);
+
+  const monthTitle = useMemo(
+    () =>
+      calendarMonth.toLocaleDateString(localeTag, {
+        month: 'long',
+        year: 'numeric',
+      }),
+    [calendarMonth, localeTag],
+  );
+
+  const goPrevMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const goNextMonth = () => {
+    if (!canGoNextMonth) return;
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
   const getCalendarDayProgress = (dayNum) => {
-    if (dayNum > today.getDate()) return 0;
-    return Math.min(Math.random() * 100, 100); // Simulated progress
+    const steps = monthDaySteps[dayNum] ?? 0;
+    return Math.min((steps / stepGoal) * 100, 100);
+  };
+
+  const openDayByDate = async (dt) => {
+    if (startOfDay(dt) > startOfDay(new Date())) return;
+    const key = getDateKey(dt);
+    const local = await getHistoricalStats(dt);
+    let stats = local || { steps: monthDaySteps[dayNum] ?? 0, date: key };
+    try {
+      const remote = await getTodayStat(key);
+      if (remote) {
+        stats = {
+          ...stats,
+          steps: remote.steps ?? stats.steps,
+          isConverted: remote.is_converted,
+          calories: remote.calories != null ? Number(remote.calories) : stats.calories,
+          distance: remote.distance_km != null ? Number(remote.distance_km) : stats.distance,
+          time: remote.duration_sec != null ? remote.duration_sec / 60 : stats.time,
+        };
+      }
+    } catch {
+      // offline
+    }
+    if ((stats.steps ?? 0) > 0) {
+      await saveLocalDailyStat(stats);
+    }
+    setSheetStats(stats);
+    setSheetDay({ dayNum: dt.getDate(), dateKey: key });
+  };
+
+  const openDaySheet = (dayNum) => {
+    if (isCalendarDayFuture(dayNum)) return;
+    openDayByDate(new Date(displayYear, displayMonthIndex, dayNum));
+  };
+
+  const openDayByDateKey = (dateKey) => {
+    if (!dateKey) return;
+    openDayByDate(new Date(`${dateKey}T12:00:00`));
+  };
+
+  useEffect(() => {
+    const focusDate = route.params?.focusDate;
+    if (!focusDate) return;
+    pendingOpenDate.current = focusDate;
+    const d = new Date(`${focusDate}T12:00:00`);
+    setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    navigation.setParams({ focusDate: undefined });
+  }, [route.params?.focusDate, navigation]);
+
+  useEffect(() => {
+    if (!pendingOpenDate.current || monthLoading) return;
+    const key = pendingOpenDate.current;
+    pendingOpenDate.current = null;
+    openDayByDateKey(key);
+  }, [monthLoading, monthDaySteps]);
+
+  const handleClaimDay = async () => {
+    if (!sheetStats || sheetStats.steps < 5000) {
+      Alert.alert(t('report.claimMinSteps'));
+      return;
+    }
+    setConverting(true);
+    try {
+      const payload = {
+        date: sheetStats.date || sheetDay?.dateKey,
+        steps: Math.floor(sheetStats.steps),
+        calories: sheetStats.calories != null ? Math.round(sheetStats.calories) : undefined,
+        distance_m:
+          sheetStats.distance != null && sheetStats.distance > 0
+            ? Math.round(Number(sheetStats.distance) * 1000)
+            : undefined,
+        duration_sec:
+          sheetStats.time != null && sheetStats.time > 0
+            ? Math.round(Number(sheetStats.time) * 60)
+            : undefined,
+      };
+      await syncActivity(payload);
+      const result = await convertSteps(payload);
+      const dateKey = payload.date;
+      await saveLocalDailyStat({
+        date: dateKey,
+        steps: payload.steps,
+        time:
+          sheetStats.time ??
+          (payload.duration_sec != null ? Math.round(payload.duration_sec / 60) : 0),
+        calories: sheetStats.calories ?? payload.calories ?? 0,
+        distance: sheetStats.distance ?? 0,
+        isConverted: true,
+      });
+      const dayNum = sheetDay?.dayNum;
+      if (dayNum != null) {
+        setMonthDaySteps((prev) => ({ ...prev, [dayNum]: payload.steps }));
+      }
+      Alert.alert(
+        t('common.success'),
+        t('report.claimed', { coins: result.coins_earned, balance: result.new_balance }),
+      );
+      await refreshWallet?.();
+      setSheetDay(null);
+    } catch (e) {
+      Alert.alert(t('common.error'), e.message);
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const isCalendarDayFuture = (dayNum) => {
+    const cell = startOfDay(new Date(displayYear, displayMonthIndex, dayNum));
+    return cell > startOfDay(new Date());
   };
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <Footprints size={24} color="#8140F3" />
           </View>
           <Text style={styles.headerTitle}>{t('tabs.report')}</Text>
-          <Pressable style={styles.menuButton}>
-            <MoreVertical size={20} color="#000000" />
-          </Pressable>
+          <View style={styles.headerSpacer} />
         </View>
 
-        {/* Total Steps */}
         <View style={styles.totalStepsContainer}>
           <Footprints size={48} color="#8140F3" strokeWidth={2} />
-          <Text style={styles.totalStepsValue}>
-            {totalStats.steps.toLocaleString()}
-          </Text>
+          <Text style={styles.totalStepsValue}>{totalStats.steps.toLocaleString()}</Text>
           <Text style={styles.totalStepsLabel}>{t('report.totalStepsCaption')}</Text>
         </View>
 
-        {/* Summary Stats */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
             <Clock size={36} color="#FF9800" strokeWidth={2} />
@@ -105,91 +368,94 @@ function ReportScreen() {
           </View>
           <View style={styles.summaryItem}>
             <Flame size={36} color="#F44336" strokeWidth={2} />
-            <Text style={styles.summaryValue}>
-              {totalStats.calories.toLocaleString()}
-            </Text>
+            <Text style={styles.summaryValue}>{totalStats.calories.toLocaleString()}</Text>
             <Text style={styles.summaryLabel}>kcal</Text>
           </View>
           <View style={styles.summaryItem}>
             <MapPin size={36} color="#4CAF50" strokeWidth={2} />
-            <Text style={styles.summaryValue}>
-              {totalStats.distance.toFixed(2)}
-            </Text>
+            <Text style={styles.summaryValue}>{totalStats.distance.toFixed(2)}</Text>
             <Text style={styles.summaryLabel}>{t('home.km')}</Text>
           </View>
         </View>
 
-        {/* Statistics Chart */}
         <View style={styles.chartSection}>
           <View style={styles.chartHeader}>
             <Text style={styles.chartTitle}>{t('report.statistics')}</Text>
-            <Pressable style={styles.weekSelector}>
-              <Text style={styles.weekSelectorText}>{t('report.thisWeek')}</Text>
-              <Text style={styles.weekSelectorArrow}>▼</Text>
-            </Pressable>
+            <View style={styles.periodNav}>
+              <Pressable
+                onPress={goPrevWeek}
+                style={styles.periodNavBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t('report.prevWeek')}
+              >
+                <ChevronLeft size={22} color="#8140F3" />
+              </Pressable>
+              <Text style={styles.weekRangeText} numberOfLines={1}>
+                {weekRangeLabel}
+              </Text>
+              <Pressable
+                onPress={goNextWeek}
+                style={[styles.periodNavBtn, !canGoNextWeek && styles.periodNavBtnDisabled]}
+                disabled={!canGoNextWeek}
+                accessibilityRole="button"
+                accessibilityLabel={t('report.nextWeek')}
+              >
+                <ChevronRight size={22} color={canGoNextWeek ? '#8140F3' : '#CCCCCC'} />
+              </Pressable>
+            </View>
           </View>
 
-          {/* Y-axis labels */}
-          <View style={styles.chartWrapper}>
-            <View style={styles.yAxis}>
-              <Text style={styles.yAxisLabel}>
-                {selectedMetric === 'Steps' ? '7k' : 
-                 selectedMetric === 'Time' ? '350' :
-                 selectedMetric === 'Calorie' ? '280' : '5.6'}
-              </Text>
-              <Text style={styles.yAxisLabel}>
-                {selectedMetric === 'Steps' ? '5k' : 
-                 selectedMetric === 'Time' ? '250' :
-                 selectedMetric === 'Calorie' ? '200' : '4'}
-              </Text>
-              <Text style={styles.yAxisLabel}>
-                {selectedMetric === 'Steps' ? '3k' : 
-                 selectedMetric === 'Time' ? '150' :
-                 selectedMetric === 'Calorie' ? '120' : '2.4'}
-              </Text>
-              <Text style={styles.yAxisLabel}>
-                {selectedMetric === 'Steps' ? '1k' : 
-                 selectedMetric === 'Time' ? '50' :
-                 selectedMetric === 'Calorie' ? '40' : '0.8'}
-              </Text>
-            </View>
+          {weekLoading ? (
+            <ActivityIndicator color="#8140F3" style={{ marginVertical: 24 }} />
+          ) : (
+            <View style={styles.chartWrapper}>
+              <View style={styles.yAxis}>
+                {yAxisTicks.map((tick, idx) => (
+                  <Text key={idx} style={styles.yAxisLabel}>
+                    {formatTickValue(tick, selectedMetric)}
+                  </Text>
+                ))}
+              </View>
 
-            {/* Bar Chart */}
-            <View style={styles.barChartContainer}>
-              <View style={styles.barChart}>
-                {weekData.map((day, index) => {
-                  const value = getMetricValue(day, selectedMetric);
-                  const height = Math.min((value / chartMax) * 150, 150);
-                  const isHighlighted = index === weekData.length - 1;
-                  return (
-                    <View key={index} style={styles.barItem}>
-                      <View style={styles.barWrapper}>
-                        {isHighlighted && (
-                          <Text style={styles.barValue}>
-                            {value.toLocaleString()}
+              <View style={styles.barChartContainer}>
+                <View style={styles.barChart}>
+                  {weekBars.map((day, index) => {
+                    const value = getMetricValue(day, selectedMetric);
+                    const height = Math.min((value / chartMax) * 150, 150);
+                    const isTodayBar = day.dateKey === todayKey;
+                    return (
+                      <Pressable
+                        key={day.dateKey}
+                        style={styles.barItem}
+                        onPress={() => openDayByDateKey(day.dateKey)}
+                      >
+                        <View style={styles.barWrapper}>
+                          <Text style={styles.barValueSmall} numberOfLines={1}>
+                            {value >= 1000 && selectedMetric === 'Steps'
+                              ? `${(value / 1000).toFixed(1)}k`
+                              : selectedMetric === 'Distance'
+                                ? value.toFixed(1)
+                                : Math.round(value)}
                           </Text>
-                        )}
-                        <View
-                          style={[
-                            styles.bar,
-                            {
-                              height: Math.max(height, 5),
-                              backgroundColor: isHighlighted ? '#8140F3' : '#E1BEE7',
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.barLabel}>
-                        {new Date().getDate() - 6 + index}
-                      </Text>
-                    </View>
-                  );
-                })}
+                          <View
+                            style={[
+                              styles.bar,
+                              {
+                                height: Math.max(height, 5),
+                                backgroundColor: isTodayBar ? '#8140F3' : '#E1BEE7',
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.barLabel}>{day.day}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
             </View>
-          </View>
+          )}
 
-          {/* Metric Selector */}
           <View style={styles.metricSelector}>
             {METRIC_KEYS.map((metric) => (
               <Pressable
@@ -213,78 +479,94 @@ function ReportScreen() {
           </View>
         </View>
 
-        {/* Calendar Progress */}
         <View style={styles.calendarSection}>
           <View style={styles.calendarHeader}>
             <Text style={styles.calendarTitle}>{t('report.yourProgress')}</Text>
-            <Pressable style={styles.monthSelector}>
-              <Text style={styles.monthSelectorText}>{t('report.thisMonth')}</Text>
-              <Text style={styles.monthSelectorArrow}>▼</Text>
-            </Pressable>
+            <View style={styles.periodNav}>
+              <Pressable
+                onPress={goPrevMonth}
+                style={styles.periodNavBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t('report.prevMonth')}
+              >
+                <ChevronLeft size={22} color="#8140F3" />
+              </Pressable>
+              <Text style={styles.monthTitleText} numberOfLines={1}>
+                {monthTitle}
+              </Text>
+              <Pressable
+                onPress={goNextMonth}
+                style={[styles.periodNavBtn, !canGoNextMonth && styles.periodNavBtnDisabled]}
+                disabled={!canGoNextMonth}
+                accessibilityRole="button"
+                accessibilityLabel={t('report.nextMonth')}
+              >
+                <ChevronRight size={22} color={canGoNextMonth ? '#8140F3' : '#CCCCCC'} />
+              </Pressable>
+            </View>
           </View>
 
-          {/* Calendar Grid with Circular Progress */}
-          <View style={styles.calendarGrid}>
-            {(Array.isArray(calendarWeekdays) ? calendarWeekdays : []).map((day) => (
-              <Text key={day} style={styles.calendarDayHeader}>
-                {day}
-              </Text>
-            ))}
-            {/* Empty cells */}
-            {Array.from({ length: firstDay }, (_, i) => (
-              <View key={`empty-${i}`} style={styles.calendarDay} />
-            ))}
-            {/* Days with circular progress */}
-            {Array.from({ length: daysInMonth }, (_, i) => {
-              const dayNum = i + 1;
-              const isPast = dayNum <= today.getDate();
-              const progress = isPast ? getCalendarDayProgress(dayNum) : 0;
-              const radius = 15;
-              const circumference = 2 * Math.PI * radius;
-              const strokeDashoffset = circumference - (progress / 100) * circumference;
-              
-              return (
-                <View key={dayNum} style={styles.calendarDay}>
-                  <View style={styles.calendarDayCircleWrapper}>
-                    <Svg width={32} height={32} style={styles.calendarDaySvg}>
-                      <Circle
-                        cx={16}
-                        cy={16}
-                        r={radius}
-                        stroke="#E8E8E8"
-                        strokeWidth={2}
-                        fill="none"
-                      />
-                      {progress > 0 && (
-                        <Circle
-                          cx={16}
-                          cy={16}
-                          r={radius}
-                          stroke="#8140F3"
-                          strokeWidth={2}
-                          fill="none"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={strokeDashoffset}
-                          strokeLinecap="round"
-                          transform={`rotate(-90 16 16)`}
-                        />
-                      )}
-                    </Svg>
-                    <View style={styles.calendarDayInner}>
-                      <Text
-                        style={[
-                          styles.calendarDayText,
-                          !isPast && styles.calendarDayTextEmpty,
-                        ]}
-                      >
-                        {dayNum}
-                      </Text>
+          {monthLoading ? (
+            <ActivityIndicator color="#8140F3" style={{ marginVertical: 16 }} />
+          ) : (
+            <View style={styles.calendarGrid}>
+              {(Array.isArray(calendarWeekdays) ? calendarWeekdays : []).map((day) => (
+                <Text key={day} style={styles.calendarDayHeader}>
+                  {day}
+                </Text>
+              ))}
+              {Array.from({ length: firstDay }, (_, i) => (
+                <View key={`empty-${i}`} style={styles.calendarDay} />
+              ))}
+              {Array.from({ length: daysInMonth }, (_, i) => {
+                const dayNum = i + 1;
+                const isFuture = isCalendarDayFuture(dayNum);
+                const progress = !isFuture ? getCalendarDayProgress(dayNum) : 0;
+                const radius = 15;
+                const circumference = 2 * Math.PI * radius;
+                const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+                return (
+                  <Pressable
+                    key={dayNum}
+                    style={styles.calendarDay}
+                    onPress={() => openDaySheet(dayNum)}
+                    disabled={isFuture}
+                  >
+                    <View style={styles.calendarDayCircleWrapper}>
+                      <Svg width={32} height={32} style={styles.calendarDaySvg}>
+                        <Circle cx={16} cy={16} r={radius} stroke="#E8E8E8" strokeWidth={2} fill="none" />
+                        {!isFuture && progress > 0 && (
+                          <Circle
+                            cx={16}
+                            cy={16}
+                            r={radius}
+                            stroke="#8140F3"
+                            strokeWidth={2}
+                            fill="none"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={strokeDashoffset}
+                            strokeLinecap="round"
+                            transform="rotate(-90 16 16)"
+                          />
+                        )}
+                      </Svg>
+                      <View style={styles.calendarDayInner}>
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            isFuture && styles.calendarDayTextEmpty,
+                          ]}
+                        >
+                          {dayNum}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
 
           <Pressable
             style={styles.allHistoryButton}
@@ -294,6 +576,45 @@ function ReportScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal visible={!!sheetDay} transparent animationType="slide" onRequestClose={() => setSheetDay(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSheetDay(null)}>
+          <Pressable style={styles.sheetCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>
+              {sheetDay?.dateKey ? new Date(sheetDay.dateKey + 'T12:00:00').toLocaleDateString(localeTag) : ''}
+            </Text>
+            <View style={styles.sheetStats}>
+              <View style={styles.sheetStatBox}>
+                <Footprints size={20} color="#8140F3" />
+                <Text style={styles.sheetStatValue}>
+                  {Math.floor(sheetStats?.steps ?? 0).toLocaleString()}
+                </Text>
+                <Text style={styles.sheetStatLabel}>{t('home.steps')}</Text>
+              </View>
+              <View style={styles.sheetStatBox}>
+                <Coins size={20} color="#F59E0B" />
+                <Text style={styles.sheetStatValue}>{tierCoinsForSteps(sheetStats?.steps ?? 0)}</Text>
+                <Text style={styles.sheetStatLabel}>{t('account.coins')}</Text>
+              </View>
+            </View>
+            {sheetStats?.isConverted && (
+              <Text style={styles.sheetConverted}>{t('report.alreadyConverted')}</Text>
+            )}
+            <Pressable
+              style={[styles.sheetClaimBtn, (converting || sheetStats?.isConverted) && styles.sheetClaimBtnDisabled]}
+              onPress={handleClaimDay}
+              disabled={converting || sheetStats?.isConverted}
+            >
+              {converting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.sheetClaimText}>{t('report.claimCoins')}</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -327,11 +648,9 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  menuButton: {
+  headerSpacer: {
     width: 30,
     height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   totalStepsContainer: {
     alignItems: 'center',
@@ -403,29 +722,39 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#000000',
+    marginBottom: 12,
   },
-  weekSelector: {
+  periodNav: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  weekSelectorText: {
+  periodNavBtn: {
+    padding: 6,
+  },
+  periodNavBtnDisabled: {
+    opacity: 0.4,
+  },
+  weekRangeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#444444',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  monthTitleText: {
+    flex: 1,
     fontSize: 14,
-    color: '#666666',
-    fontWeight: '500',
-  },
-  weekSelectorArrow: {
-    fontSize: 10,
-    color: '#666666',
+    color: '#444444',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   chartWrapper: {
     flexDirection: 'row',
@@ -433,12 +762,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   yAxis: {
-    width: 30,
+    width: 36,
     justifyContent: 'space-between',
-    paddingRight: 10,
+    paddingRight: 6,
   },
   yAxisLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#666666',
     fontWeight: '500',
   },
@@ -454,6 +783,7 @@ const styles = StyleSheet.create({
   barItem: {
     alignItems: 'center',
     flex: 1,
+    maxWidth: 48,
   },
   barWrapper: {
     alignItems: 'center',
@@ -461,31 +791,33 @@ const styles = StyleSheet.create({
     height: 150,
     width: '100%',
   },
+  barValueSmall: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#8140F3',
+    marginBottom: 4,
+  },
   bar: {
     width: '70%',
     minHeight: 5,
     borderRadius: 8,
     marginBottom: 5,
   },
-  barValue: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#8140F3',
-    marginBottom: 5,
-  },
   barLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666666',
     fontWeight: '500',
   },
   metricSelector: {
     flexDirection: 'row',
     gap: 10,
+    flexWrap: 'wrap',
   },
   metricButton: {
     flex: 1,
+    minWidth: '22%',
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     borderRadius: 20,
     backgroundColor: '#F5F5F5',
     alignItems: 'center',
@@ -494,7 +826,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8140F3',
   },
   metricButtonText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#666666',
     fontWeight: '500',
   },
@@ -516,29 +848,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   calendarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   calendarTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#000000',
-  },
-  monthSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  monthSelectorText: {
-    fontSize: 14,
-    color: '#666666',
-    fontWeight: '500',
-  },
-  monthSelectorArrow: {
-    fontSize: 10,
-    color: '#666666',
+    marginBottom: 12,
   },
   calendarGrid: {
     flexDirection: 'row',
@@ -600,6 +916,81 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   allHistoryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(17,24,39,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheetCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 12,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 16,
+    color: '#111827',
+    textAlign: 'center',
+  },
+  sheetStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  sheetStatBox: {
+    flex: 1,
+    backgroundColor: '#F8F9FB',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8EAEF',
+  },
+  sheetStatValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+    marginTop: 8,
+  },
+  sheetStatLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  sheetConverted: {
+    fontSize: 14,
+    color: '#16A34A',
+    marginBottom: 12,
+    fontWeight: '600',
+  },
+  sheetClaimBtn: {
+    backgroundColor: '#8140F3',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  sheetClaimBtnDisabled: {
+    opacity: 0.5,
+  },
+  sheetClaimText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',

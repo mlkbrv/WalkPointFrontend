@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, Download, ExternalLink, Info, Send } from 'lucide-react-native';
-import React from 'react';
+import { ArrowLeft, Download, ExternalLink, Heart, Info, Send } from 'lucide-react-native';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { toggleFavoriteCoupon } from '../services/apiService';
 
 let QRCode = null;
 try {
@@ -31,6 +32,8 @@ const CARD_SHADOW = {
 export default function CouponDetailScreen({ route, navigation }) {
   const { t, i18n } = useTranslation();
   const coupon = route.params?.coupon || {};
+  const templateId = coupon.template_id ?? coupon.template;
+  const [favorited, setFavorited] = useState(Boolean(coupon.is_favorite));
   const title = coupon.template_title || coupon.title || t('market.offerFallback');
   const partner = coupon.partner_name || t('common.partner');
   const code = coupon.unique_code || coupon.code || '—';
@@ -45,8 +48,18 @@ export default function CouponDetailScreen({ route, navigation }) {
     return date.toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' });
   };
 
-  const handleSave = () => {
-    Alert.alert(t('couponDetail.savedTitle'), t('couponDetail.savedMessage'));
+  const handleSave = async () => {
+    if (!templateId) {
+      Alert.alert(t('couponDetail.savedTitle'), t('couponDetail.savedMessage'));
+      return;
+    }
+    try {
+      const r = await toggleFavoriteCoupon(templateId);
+      setFavorited(r.is_favorite);
+      Alert.alert(t('common.success'), r.is_favorite ? t('couponDetail.favorited') : t('couponDetail.unfavorited'));
+    } catch (e) {
+      Alert.alert(t('common.error'), e.message);
+    }
   };
 
   const handleShare = async () => {
@@ -75,7 +88,13 @@ export default function CouponDetailScreen({ route, navigation }) {
           <ArrowLeft size={24} color="#FFF" />
         </Pressable>
         <Text style={styles.headerTitle}>{t('couponDetail.title')}</Text>
-        <View style={styles.headerRight} />
+        {templateId ? (
+          <Pressable style={styles.headerRight} onPress={handleSave}>
+            <Heart size={22} color={favorited ? '#F44336' : '#FFF'} fill={favorited ? '#F44336' : 'transparent'} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerRight} />
+        )}
       </View>
 
       <ScrollView

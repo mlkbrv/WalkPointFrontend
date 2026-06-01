@@ -10,19 +10,23 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { updateProfile } from '../services/apiService';
 
 export default function AccountSettingsScreen({ navigation }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { refreshWallet, syncStepsFromSystem, openHealthConnectSettings, useHealthConnect } = useApp();
-  const { refreshProfile } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [stepGoal, setStepGoal] = useState(String(user?.step_goal ?? 10000));
+  const [savingGoal, setSavingGoal] = useState(false);
 
   const handleRefresh = async () => {
     setBusy(true);
@@ -38,6 +42,24 @@ export default function AccountSettingsScreen({ navigation }) {
 
   const openSystemSettings = () => {
     Linking.openSettings().catch(() => {});
+  };
+
+  const saveStepGoal = async () => {
+    const n = parseInt(stepGoal, 10);
+    if (!Number.isFinite(n) || n < 1000 || n > 100000) {
+      Alert.alert(t('common.error'), t('account.stepGoalInvalid'));
+      return;
+    }
+    setSavingGoal(true);
+    try {
+      await updateProfile({ step_goal: n });
+      await refreshProfile?.();
+      Alert.alert(t('common.success'), t('account.stepGoalSaved'));
+    } catch (e) {
+      Alert.alert(t('common.error'), e?.message || t('common.error'));
+    } finally {
+      setSavingGoal(false);
+    }
   };
 
   const showHealthSettings =
@@ -85,6 +107,27 @@ export default function AccountSettingsScreen({ navigation }) {
             <Text style={styles.rowText}>{t('account.stepsAndHealth')}</Text>
           </Pressable>
         ) : null}
+
+        <View style={styles.goalBlock}>
+          <Text style={styles.goalLabel}>{t('account.stepGoal')}</Text>
+          <TextInput
+            style={styles.goalInput}
+            keyboardType="number-pad"
+            value={stepGoal}
+            onChangeText={setStepGoal}
+          />
+          <Pressable
+            style={[styles.goalSave, savingGoal && styles.rowDisabled]}
+            onPress={saveStepGoal}
+            disabled={savingGoal}
+          >
+            {savingGoal ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.goalSaveText}>{t('common.save')}</Text>
+            )}
+          </Pressable>
+        </View>
 
         <Pressable
           style={styles.row}
@@ -167,5 +210,37 @@ const styles = StyleSheet.create({
   },
   rowEnd: {
     marginLeft: 8,
+  },
+  goalBlock: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 12,
+  },
+  goalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  goalInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  goalSave: {
+    backgroundColor: '#8140F3',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  goalSaveText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });

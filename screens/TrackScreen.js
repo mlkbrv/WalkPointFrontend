@@ -12,13 +12,15 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useTranslation } from 'react-i18next';
+import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
-import { calculateRouteDistance } from '../utils/calculations';
+import { calculateRouteDistance, getDateKey } from '../utils/calculations';
 
 const { width, height } = Dimensions.get('window');
 
 export default function TrackScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const {
     dailyStats,
     currentRoute,
@@ -37,6 +39,7 @@ export default function TrackScreen() {
   const [trackingStartTime, setTrackingStartTime] = useState(null);
   const subscriptionRef = useRef(null);
   const webViewRef = useRef(null);
+  const stepsAtStartRef = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -101,6 +104,7 @@ export default function TrackScreen() {
   }, [isTrackingRoute]);
 
   const startTracking = () => {
+    stepsAtStartRef.current = safeDailyStats.steps ?? 0;
     setRouteCoordinates([]);
     setTrackingStartTime(new Date());
     setIsTrackingRoute(true);
@@ -114,16 +118,17 @@ export default function TrackScreen() {
     }
     setIsTrackingRoute(false);
     if (routeCoordinates.length > 0 && trackingStartTime) {
-      const duration = Math.floor((new Date() - trackingStartTime) / 1000 / 60);
-      // Calculate route distance using Haversine formula
+      const duration = Math.max(1, Math.floor((new Date() - trackingStartTime) / 1000 / 60));
       const routeDistance = calculateRouteDistance(routeCoordinates);
+      const stepsDelta = Math.max(0, (safeDailyStats.steps ?? 0) - stepsAtStartRef.current);
       const session = {
-        id: Date.now(),
-        date: new Date().toISOString(),
-        steps: safeDailyStats.steps,
+        id: String(Date.now()),
+        date: getDateKey(new Date()),
+        kind: 'route',
+        steps: stepsDelta > 0 ? stepsDelta : Math.max(1, Math.round(routeDistance * 1300)),
         time: duration,
-        calories: safeDailyStats.calories,
-        distance: routeDistance > 0 ? routeDistance : safeDailyStats.distance, // Use GPS distance if available
+        calories: Math.round((safeDailyStats.calories ?? 0) * (duration / Math.max(safeDailyStats.time || 1, 1))) || 0,
+        distance: routeDistance > 0 ? routeDistance : safeDailyStats.distance,
         route: routeCoordinates,
       };
       addTrackingSession(session);
@@ -216,7 +221,10 @@ export default function TrackScreen() {
           <Footprints size={24} color="#8140F3" />
         </View>
         <Text style={styles.headerTitle}>{t('tabs.track')}</Text>
-        <Pressable style={styles.menuButton}>
+        <Pressable
+          style={styles.menuButton}
+          onPress={() => navigation.navigate('Report', { screen: 'History' })}
+        >
           <MoreVertical size={20} color="#000000" />
         </Pressable>
       </View>
@@ -254,7 +262,9 @@ export default function TrackScreen() {
         <View style={styles.statItem}>
           <Clock size={28} color="#FF9800" strokeWidth={2} />
           <Text style={styles.statValue}>
-            {Math.floor(safeDailyStats.time / 60)}h {safeDailyStats.time % 60}m
+            {safeDailyStats.time >= 60
+              ? `${Math.floor(safeDailyStats.time / 60)}h ${safeDailyStats.time % 60}m`
+              : `${safeDailyStats.time}m`}
           </Text>
           <Text style={styles.statLabel}>{t('home.time')}</Text>
         </View>

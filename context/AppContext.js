@@ -1,14 +1,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Platform, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Platform, View } from 'react-native';
 import BodyProfileModal from '../components/BodyProfileModal';
 import { useHealthData } from '../hooks/useHealthData';
 import {
   convertSteps as apiConvertSteps,
+  getTodayStat,
   getTokens,
   getWallet,
   syncActivity as apiSyncActivity,
+  updateProfile as apiUpdateProfile,
 } from '../services/apiService';
+import {
+  saveLocalDailyStat,
+  serverStatToLocal,
+  syncActivityStatsFromServer,
+} from '../services/activitySync';
+import {
+  getNativeTodayStatsSafe,
+  isNativeStepCounterSupported,
+  startNativeStepTracking,
+} from '../services/nativeStepCounter';
+
+const STORAGE_NATIVE_SENSOR_HC_BYPASS = 'walkpoint_native_sensor_hc_onboarding_bypass';
 import * as healthService from '../services/healthService';
 import {
   calculateDistanceFromSteps,
@@ -32,11 +46,12 @@ const CALENDAR_ROLLOVER_STORAGE_KEY = 'walkpoint_last_activity_calendar_date';
 const AUTO_FINALIZE_PREVIOUS_DAY_ON_SERVER = true;
 
 /** Matches backend ActivitySource (health_connect | pedometer | ios_health | unknown). */
-const activitySourceFromSystemSync = (platform, usedHealthKitOrHc) => {
+const activitySourceFromSystemSync = (platform, usedHealthKitOrHc, usedAndroidPedometer) => {
   if (usedHealthKitOrHc) {
     return platform === 'ios' ? 'ios_health' : 'health_connect';
   }
   if (platform === 'ios') return 'pedometer';
+  if (platform === 'android' && usedAndroidPedometer) return 'pedometer';
   return 'unknown';
 };
 
@@ -62,6 +77,7 @@ const DEFAULT_APP_VALUE = {
   resetDailyStats: () => {},
   addTrackingSession: () => {},
   updateWeeklyProgress: () => {},
+  loadWeeklyProgress: async () => {},
   setCurrentRoute: () => {},
   setIsTrackingRoute: () => {},
   getHistoricalStats: async () => null,
@@ -70,6 +86,7 @@ const DEFAULT_APP_VALUE = {
   healthConnectReady: false,
   useHealthConnect: false,
   initHealthConnect: async () => false,
+  continueWithNativeSensorWithoutHc: async () => false,
   requestHealthConnectPermission: async () => false,
   openHealthConnectSettings: () => {},
   openSamsungHealth: async () => {},
@@ -86,6 +103,7 @@ const DEFAULT_APP_VALUE = {
   convertStepsToCoins: async () => null,
   refreshWallet: async () => {},
   fetchBackendData: async () => {},
+  syncActivityHistory: async () => {},
   bodyProfile: { weightKg: 75, heightCm: null },
   openBodyProfileEditor: () => {},
 };
@@ -129,11 +147,22 @@ export const AppProvider = ({ children }) => {
   const activityPushTimerRef = useRef(null);
   const resetDailyStatsForNewDayRef = useRef(async (_previousDateKey) => {});
   const syncStepsInFlightRef = useRef(false);
+  const interruptAlertShownRef = useRef(false);
   const rolloverInProgressRef = useRef(false);
   const [activityPermissionGranted, setActivityPermissionGranted] = useState(true); // Always true now
   const [isBackgroundServiceRunning] = useState(false);
+  const [nativeSensorHcBypass, setNativeSensorHcBypass] = useState(false);
 
   const healthData = useHealthData();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem(STORAGE_NATIVE_SENSOR_HC_BYPASS);
+        if (v === '1') setNativeSensorHcBypass(true);
+      } catch (_) {}
+    })();
+  }, []);
 
   const refreshBodyProfileFromHealth = useCallback(async () => {
     if (!healthData.isReady) return;
@@ -221,15 +250,17 @@ export const AppProvider = ({ children }) => {
         const tokens = await getTokens();
         if (!tokens?.access) return;
         const steps = Math.max(0, Math.floor(stats.steps ?? 0));
-        if (steps < 1) return;
+        if (steps < 5000) return;
 
-        const usedNative =
+        const usedHcOnly =
           Platform.OS === 'ios'
             ? healthData.isReady
             : Platform.OS === 'android' &&
               healthData.healthConnectAvailable === true &&
               healthData.isReady;
-        const source = activitySourceFromSystemSync(Platform.OS, usedNative);
+        const source =
+          stats.activitySource ||
+          activitySourceFromSystemSync(Platform.OS, usedHcOnly, false);
         const distanceKm = Number(stats.distance) || 0;
         const payload = {
           date: previousDateKey,
@@ -286,13 +317,12 @@ export const AppProvider = ({ children }) => {
   const [walletBalance, setWalletBalance] = useState('0.00');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Steps come from Health Connect / Apple Health only.
+  // Steps: Android native pedometer (foreground service) first, else Health Connect; iOS: HealthKit.
   const requestActivityPermission = useCallback(async () => {
     setActivityPermissionGranted(true);
     return true;
   }, []);
 
-  // Sync steps from Health Connect or Apple Health
   const syncStepsFromSystem = useCallback(async () => {
     if (syncStepsInFlightRef.current) return;
     syncStepsInFlightRef.current = true;
@@ -310,22 +340,45 @@ export const AppProvider = ({ children }) => {
 
       let systemStepsToday = 0;
       let usedHealthNative = false;
+      let usedAndroidPedometer = false;
+      let activeWalkingMs = 0;
 
       if (Platform.OS === 'android') {
-        if (healthData.healthConnectAvailable === null) return;
-        try {
-          if (healthData.healthConnectAvailable === true && healthData.isReady) {
-            const hcSteps = await healthData.getTodaySteps();
-            if (hcSteps > 0) console.log('Health Connect steps today:', hcSteps);
-            systemStepsToday = hcSteps || 0;
-            usedHealthNative = true;
+        const nativeStats = getNativeTodayStatsSafe();
+        if (nativeStats && isNativeStepCounterSupported() && nativeStats.tracking) {
+          systemStepsToday = Number(nativeStats.steps) || 0;
+          usedAndroidPedometer = true;
+          activeWalkingMs = Number(nativeStats.activeWalkingMs) || 0;
+
+          if (nativeStats.trackingInterrupted && !interruptAlertShownRef.current) {
+            interruptAlertShownRef.current = true;
+            Alert.alert(
+              i18n.t('nativeSteps.interruptTitle'),
+              i18n.t('nativeSteps.interruptMessage'),
+              [{ text: i18n.t('common.ok') }],
+            );
           }
-        } catch (err) {
-          console.warn('Health Connect sync failed:', err?.message ?? err);
-          systemStepsToday = 0;
+          if (!nativeStats.trackingInterrupted) {
+            interruptAlertShownRef.current = false;
+          }
         }
-      }
-      else if (Platform.OS === 'ios') {
+
+        if (!usedAndroidPedometer) {
+          if (healthData.healthConnectAvailable === null) return;
+
+          try {
+            if (healthData.healthConnectAvailable === true && healthData.isReady) {
+              const hcSteps = await healthData.getTodaySteps();
+              if (hcSteps > 0) console.log('Health Connect steps today:', hcSteps);
+              systemStepsToday = hcSteps || 0;
+              usedHealthNative = true;
+            }
+          } catch (err) {
+            console.warn('Health Connect sync failed:', err?.message ?? err);
+            systemStepsToday = 0;
+          }
+        }
+      } else if (Platform.OS === 'ios') {
         if (healthData.isReady) {
           try {
             systemStepsToday = await healthData.getTodaySteps();
@@ -342,21 +395,35 @@ export const AppProvider = ({ children }) => {
       if (systemStepsToday <= 0) return;
 
       const prevSteps = currentStats.steps || 0;
-      
-      if (systemStepsToday <= prevSteps) {
+
+      if (!usedAndroidPedometer && systemStepsToday <= prevSteps) {
         console.log('No new steps:', systemStepsToday, 'vs saved', prevSteps);
+        return;
+      }
+      if (usedAndroidPedometer && systemStepsToday === prevSteps) {
         return;
       }
 
       console.log('Updating steps from system:', prevSteps, '->', systemStepsToday);
-      
+
       const w = bodyProfileRef.current.weightKg;
       const h = bodyProfileRef.current.heightCm;
       const newCalories = calculateWalkingCaloriesFromSteps(systemStepsToday, w, h);
       const newDistance = calculateDistanceFromSteps(systemStepsToday, h);
-      
-      // Calculate time based on steps (approx 100 steps per minute)
-      const newTime = Math.round(systemStepsToday / 100);
+
+      const cadenceMin = Math.round(systemStepsToday / 100);
+      const walkMinFromSensor =
+        activeWalkingMs > 0 ? Math.max(1, Math.round(activeWalkingMs / 60000)) : 0;
+      const newTime = Math.max(cadenceMin, walkMinFromSensor);
+
+      let activitySource = 'unknown';
+      if (Platform.OS === 'ios' && usedHealthNative) {
+        activitySource = 'ios_health';
+      } else if (Platform.OS === 'android' && usedAndroidPedometer) {
+        activitySource = 'pedometer';
+      } else if (Platform.OS === 'android' && usedHealthNative) {
+        activitySource = 'health_connect';
+      }
 
       const updatedStats = {
         ...currentStats,
@@ -364,6 +431,8 @@ export const AppProvider = ({ children }) => {
         time: newTime,
         calories: newCalories,
         distance: newDistance,
+        date: dateKey,
+        activitySource,
         lastUpdated: new Date().toISOString(),
       };
 
@@ -371,21 +440,22 @@ export const AppProvider = ({ children }) => {
       setDailyStats(updatedStats);
       setStepCount(systemStepsToday);
 
-      if (systemStepsToday > prevSteps) {
-        const totalStatsKey = 'totalStats';
-        const savedTotal = await AsyncStorage.getItem(totalStatsKey);
-        let totalStats = savedTotal ? JSON.parse(savedTotal) : { steps: 0, time: 0, calories: 0, distance: 0 };
-        const stepDiff = systemStepsToday - prevSteps;
-        totalStats.steps += stepDiff;
-        totalStats.time = newTime;
-        totalStats.calories = newCalories;
-        totalStats.distance = newDistance;
-        await AsyncStorage.setItem(totalStatsKey, JSON.stringify(totalStats));
-        setTotalStats(totalStats);
-      }
+      const totalStatsKey = 'totalStats';
+      const savedTotal = await AsyncStorage.getItem(totalStatsKey);
+      let nextTotal = savedTotal
+        ? JSON.parse(savedTotal)
+        : { steps: 0, time: 0, calories: 0, distance: 0 };
+      const stepDiff = systemStepsToday - prevSteps;
+      nextTotal.steps += stepDiff;
+      nextTotal.time = newTime;
+      nextTotal.calories = newCalories;
+      nextTotal.distance = newDistance;
+      await AsyncStorage.setItem(totalStatsKey, JSON.stringify(nextTotal));
+      setTotalStats(nextTotal);
 
-      const syncSource = activitySourceFromSystemSync(Platform.OS, usedHealthNative);
-      void pushActivityToBackend(updatedStats, syncSource);
+      void pushActivityToBackend(updatedStats, activitySource);
+
+      await loadWeeklyProgress();
     } catch (err) {
       console.error('syncStepsFromSystem error:', err);
     } finally {
@@ -398,6 +468,19 @@ export const AppProvider = ({ children }) => {
     pushActivityToBackend,
     refreshBodyProfileFromHealth,
   ]);
+
+  const continueWithNativeSensorWithoutHc = useCallback(async () => {
+    if (Platform.OS !== 'android') return false;
+    const ok = await startNativeStepTracking();
+    if (ok) {
+      try {
+        await AsyncStorage.setItem(STORAGE_NATIVE_SENSOR_HC_BYPASS, '1');
+      } catch (_) {}
+      setNativeSensorHcBypass(true);
+      await syncStepsFromSystem();
+    }
+    return ok;
+  }, [syncStepsFromSystem]);
 
   const saveUserBodyProfile = useCallback(
     async (weightKg, heightCm) => {
@@ -413,6 +496,18 @@ export const AppProvider = ({ children }) => {
         setBodyProfile(next);
         bodyProfileModalManualOpenRef.current = false;
         setShowBodyProfileModal(false);
+
+        try {
+          const tokens = await getTokens();
+          if (tokens?.access) {
+            await apiUpdateProfile({
+              weight_kg: w,
+              height_cm: h,
+            });
+          }
+        } catch (err) {
+          console.warn('updateProfile:', err?.message ?? err);
+        }
 
         const dateKey = getDateKey();
         const storageKey = `dailyStats_${dateKey}`;
@@ -436,7 +531,7 @@ export const AppProvider = ({ children }) => {
           await AsyncStorage.setItem('totalStats', JSON.stringify(total));
           setTotalStats(total);
         }
-        scheduleDebouncedActivityPush('unknown');
+        scheduleDebouncedActivityPush(stats.activitySource || 'unknown');
       } catch (err) {
         console.warn('saveUserBodyProfile:', err?.message ?? err);
       }
@@ -613,25 +708,55 @@ export const AppProvider = ({ children }) => {
 
   // ── Backend sync ──
 
+  const syncActivityHistory = useCallback(async () => {
+    try {
+      const tokens = await getTokens();
+      if (!tokens?.access) return null;
+      return await syncActivityStatsFromServer(90);
+    } catch (err) {
+      console.warn('syncActivityHistory:', err?.message ?? err);
+      return null;
+    }
+  }, []);
+
   const fetchBackendData = async () => {
     try {
+      const tokens = await getTokens();
+      if (!tokens?.access) return;
       const wallet = await getWallet();
       setWalletBalance(wallet.balance || '0.00');
+      await syncActivityHistory();
+      const todayRemote = await getTodayStat(getDateKey());
+      if (todayRemote?.steps != null) {
+        const merged = await saveLocalDailyStat(serverStatToLocal(todayRemote));
+        const todayKey = getDateKey();
+        if (merged.date === todayKey) {
+          setDailyStats(merged);
+          setStepCount(merged.steps || 0);
+        }
+      }
+      await loadWeeklyProgress();
     } catch {
-      // offline or not authed yet
     }
   };
 
   const convertStepsToCoins = async () => {
     const stats = dailyStats ?? defaultDailyStats;
     if (!stats || stats.steps < 1) return null;
-    const usedNative =
+    const nativeSnap = getNativeTodayStatsSafe();
+    const androidPedometerActive =
+      Platform.OS === 'android' &&
+      nativeSnap?.tracking &&
+      isNativeStepCounterSupported();
+    const usedHc =
       Platform.OS === 'ios'
         ? healthData.isReady
         : Platform.OS === 'android' &&
           healthData.healthConnectAvailable === true &&
           healthData.isReady;
-    const source = activitySourceFromSystemSync(Platform.OS, usedNative);
+    const source =
+      stats.activitySource ||
+      activitySourceFromSystemSync(Platform.OS, usedHc, androidPedometerActive);
     setIsSyncing(true);
     try {
       const result = await apiConvertSteps({
@@ -674,22 +799,29 @@ export const AppProvider = ({ children }) => {
       lastDateRef.current = dateKey;
       const storageKey = `dailyStats_${dateKey}`;
       const savedStats = await AsyncStorage.getItem(storageKey);
+      let stats = savedStats
+        ? JSON.parse(savedStats)
+        : {
+            steps: 0,
+            time: 0,
+            calories: 0,
+            distance: 0,
+            date: dateKey,
+          };
 
-      if (savedStats) {
-        const stats = JSON.parse(savedStats);
-        setDailyStats(stats);
-        setStepCount(stats.steps || 0);
-      } else {
-        const newStats = {
-          steps: 0,
-          time: 0,
-          calories: 0,
-          distance: 0,
-          date: dateKey,
-        };
-        setDailyStats(newStats);
-        await saveData(storageKey, newStats);
-      }
+      try {
+        const tokens = await getTokens();
+        if (tokens?.access) {
+          const remote = await getTodayStat(dateKey);
+          if (remote) {
+            stats = await saveLocalDailyStat(serverStatToLocal(remote));
+          }
+        }
+      } catch (_) {}
+
+      setDailyStats(stats);
+      setStepCount(stats.steps || 0);
+      if (!savedStats) await saveData(storageKey, stats);
     } catch (error) {
       console.error('Error loading today stats:', error);
     }
@@ -728,12 +860,14 @@ export const AppProvider = ({ children }) => {
           week.push({
             day: date.toLocaleDateString('en-US', { weekday: 'short' }),
             date: date.getDate(),
+            dateKey,
             steps: stats.steps || 0,
           });
         } else {
           week.push({
             day: date.toLocaleDateString('en-US', { weekday: 'short' }),
             date: date.getDate(),
+            dateKey,
             steps: 0,
           });
         }
@@ -759,6 +893,10 @@ export const AppProvider = ({ children }) => {
 
     setIsTracking(true);
     setTrackingStartTime(new Date());
+
+    if (Platform.OS === 'android' && isNativeStepCounterSupported()) {
+      await startNativeStepTracking();
+    }
 
     syncStepsFromSystem();
     syncIntervalRef.current = setInterval(syncStepsFromSystem, FOREGROUND_SYNC_INTERVAL_MS);
@@ -904,6 +1042,7 @@ export const AppProvider = ({ children }) => {
     resetDailyStats,
     addTrackingSession,
     updateWeeklyProgress,
+    loadWeeklyProgress,
     setCurrentRoute,
     setIsTrackingRoute,
     getHistoricalStats,
@@ -914,6 +1053,7 @@ export const AppProvider = ({ children }) => {
     healthConnectReady: healthData.isReady,
     useHealthConnect: healthData.isAvailable,
     initHealthConnect: healthData.init,
+    continueWithNativeSensorWithoutHc,
     requestHealthConnectPermission: healthData.retryInit,
     openHealthConnectSettings: healthData.openSettings,
     openSamsungHealth: healthData.openSamsungHealth,
@@ -932,6 +1072,7 @@ export const AppProvider = ({ children }) => {
     convertStepsToCoins,
     refreshWallet,
     fetchBackendData,
+    syncActivityHistory,
     bodyProfile,
     openBodyProfileEditor,
   };
@@ -946,13 +1087,18 @@ export const AppProvider = ({ children }) => {
     );
   }
   // 1) HC not installed → install screen
-  // 2) HC installed but no permission → onboarding "Подключить шаги"
+  // 2) HC installed but no permission → onboarding "Подключить шаги" (skip on Android if hardware step counter exists)
   // 3) else → main app
+  const skipHcOnboardingForAndroidSensor =
+    Platform.OS === 'android' && isNativeStepCounterSupported();
+
   const showStepsOnboarding =
     healthData.isAvailable &&
     healthData.healthConnectAvailable === true &&
     !healthData.isReady &&
-    (Platform.OS === 'android' || Platform.OS === 'ios');
+    (Platform.OS === 'android' || Platform.OS === 'ios') &&
+    !skipHcOnboardingForAndroidSensor &&
+    !nativeSensorHcBypass;
 
   return (
     <AppContext.Provider value={value}>

@@ -1,5 +1,6 @@
+import * as Linking from 'expo-linking';
 import { Footprints } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,15 +15,33 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
-export default function RegisterScreen({ navigation }) {
+export default function RegisterScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { register } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fromRoute = route?.params?.ref;
+    if (fromRoute) {
+      setReferralCode(String(fromRoute));
+      return;
+    }
+    const applyUrl = (url) => {
+      if (!url) return;
+      const parsed = Linking.parse(url);
+      const ref = parsed.queryParams?.ref;
+      if (ref) setReferralCode(String(ref));
+    };
+    Linking.getInitialURL().then(applyUrl);
+    const sub = Linking.addEventListener('url', ({ url }) => applyUrl(url));
+    return () => sub.remove();
+  }, [route?.params?.ref]);
 
   const handleRegister = async () => {
     if (!email || !password || !firstName) {
@@ -41,6 +60,7 @@ export default function RegisterScreen({ navigation }) {
         password,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
+        referral_code: referralCode.trim(),
       });
     } catch (e) {
       setError(e.message || t('auth.registrationFailed'));
@@ -95,6 +115,14 @@ export default function RegisterScreen({ navigation }) {
             secureTextEntry
             value={password}
             onChangeText={setPassword}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder={t('auth.referralCode')}
+            placeholderTextColor="#999"
+            autoCapitalize="characters"
+            value={referralCode}
+            onChangeText={setReferralCode}
           />
 
           <Pressable

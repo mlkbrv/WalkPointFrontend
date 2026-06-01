@@ -131,7 +131,7 @@ export default function MyCouponsScreen({ navigation }) {
           <ArrowLeft size={24} color="#FFF" />
         </Pressable>
         <Text style={styles.headerTitle}>{t('myCoupons.title')}</Text>
-        <Pressable style={styles.headerBtn}>
+        <Pressable style={styles.headerBtn} onPress={() => navigation.navigate('Favorites')}>
           <Menu size={24} color="#FFF" />
         </Pressable>
       </View>

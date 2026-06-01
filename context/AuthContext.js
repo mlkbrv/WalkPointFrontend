@@ -49,8 +49,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async ({ email, password, first_name, last_name }) => {
-    await apiRegister({ email, password, first_name, last_name });
+  const register = async ({ email, password, first_name, last_name, referral_code }) => {
+    await apiRegister({ email, password, first_name, last_name, referral_code });
     await apiLogin(email, password);
     const profile = await getProfile();
     setUser(profile);

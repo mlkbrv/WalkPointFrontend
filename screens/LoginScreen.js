@@ -85,6 +85,10 @@ export default function LoginScreen({ navigation }) {
             )}
           </Pressable>
 
+          <Pressable onPress={() => navigation.navigate('ForgotPassword')}>
+            <Text style={styles.forgotText}>{t('auth.forgotPassword')}</Text>
+          </Pressable>
+
           <Pressable onPress={() => navigation.navigate('Register')}>
             <Text style={styles.linkText}>
               {t('auth.signUpLink')}{' '}
@@ -163,6 +167,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
+  },
+  forgotText: {
+    textAlign: 'center',
+    color: '#8140F3',
+    fontSize: 14,
+    marginTop: 16,
+    fontWeight: '600',
   },
   linkText: {
     textAlign: 'center',
