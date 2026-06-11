@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
@@ -17,11 +18,17 @@ const CARD_SHADOW = {
   elevation: 8,
 };
 
-const BRAND_COLORS = ['#E31837', '#00704A', '#FFC72C', '#8140F3', '#2196F3'];
-const getBrandColor = (name) => BRAND_COLORS[(name || '').length % BRAND_COLORS.length];
+const BRAND_COLORS = ['#E31837', '#00704A', '#FFC72C', '#2196F3', '#9C27B0'];
+const getBrandColor = (name, primary) => {
+  const list = [...BRAND_COLORS, primary];
+  return list[(name || '').length % list.length];
+};
 
 export default function CouponRedeemScreen({ route, navigation }) {
   const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { walletBalance, refreshWallet } = useApp();
   const coupon = route.params?.coupon || {};
   const stepsRequired = route.params?.stepsRequired ?? 5000;
@@ -29,7 +36,7 @@ export default function CouponRedeemScreen({ route, navigation }) {
   const partner = coupon.partner_name || t('common.partner');
   const price = parseFloat(coupon.price || 0);
   const validUntil = coupon.valid_until || coupon.expires_at;
-  const brandBg = getBrandColor(partner);
+  const brandBg = getBrandColor(partner, c.primary);
 
   const formatDate = (d) => {
     if (!d) return '';
@@ -86,7 +93,7 @@ export default function CouponRedeemScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color="#1a1a1a" />
@@ -128,7 +135,7 @@ export default function CouponRedeemScreen({ route, navigation }) {
               cx={ringSize / 2}
               cy={ringSize / 2}
               r={r}
-              stroke="#8140F3"
+              stroke={c.primary}
               strokeWidth={strokeWidth}
               fill="none"
               strokeDasharray={`${circumference * 0.75} ${circumference * 0.25}`}
@@ -155,10 +162,12 @@ export default function CouponRedeemScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: c.screenBg,
     paddingHorizontal: SPACE.sm,
   },
   header: {
@@ -268,7 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.sm,
     paddingVertical: SPACE.md,
     paddingBottom: SPACE.lg + 8,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: c.screenBg,
   },
   backButton: {
     flex: 1,
@@ -285,7 +294,7 @@ const styles = StyleSheet.create({
   },
   redeemButton: {
     flex: 1,
-    backgroundColor: '#8140F3',
+    backgroundColor: c.primary,
     paddingVertical: SPACE.sm,
     borderRadius: 999,
     alignItems: 'center',
@@ -295,6 +304,7 @@ const styles = StyleSheet.create({
   redeemButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
+    color: c.onPrimary,
   },
-});
+  });
+}

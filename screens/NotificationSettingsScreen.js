@@ -1,10 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import ScreenHeader from '../components/ui/ScreenHeader';
-import { colors, radii, shadow, spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import {
   getNotificationPrefs,
   requestNotificationPermission,
@@ -13,6 +13,9 @@ import {
 
 export default function NotificationSettingsScreen() {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const [prefs, setPrefs] = useState({ eveningReminder: true, claimReminder: true });
 
@@ -33,7 +36,7 @@ export default function NotificationSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScreenHeader title={t('notifications.settingsTitle')} onBack={() => navigation.goBack()} />
       <View style={styles.card}>
         <View style={styles.row}>
@@ -44,8 +47,8 @@ export default function NotificationSettingsScreen() {
           <Switch
             value={prefs.eveningReminder}
             onValueChange={() => toggle('eveningReminder')}
-            trackColor={{ false: colors.border, true: colors.primarySoft }}
-            thumbColor={prefs.eveningReminder ? colors.primary : '#f4f3f4'}
+            trackColor={{ false: c.cardBorder, true: c.primarySoft }}
+            thumbColor={prefs.eveningReminder ? c.primary : c.card}
           />
         </View>
         <View style={styles.divider} />
@@ -57,8 +60,8 @@ export default function NotificationSettingsScreen() {
           <Switch
             value={prefs.claimReminder}
             onValueChange={() => toggle('claimReminder')}
-            trackColor={{ false: colors.border, true: colors.primarySoft }}
-            thumbColor={prefs.claimReminder ? colors.primary : '#f4f3f4'}
+            trackColor={{ false: c.cardBorder, true: c.primarySoft }}
+            thumbColor={prefs.claimReminder ? c.primary : c.card}
           />
         </View>
       </View>
@@ -66,25 +69,29 @@ export default function NotificationSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  card: {
-    margin: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    ...shadow.card,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  rowText: { flex: 1 },
-  label: { fontSize: 16, fontWeight: '600', color: colors.text },
-  hint: { fontSize: 13, color: colors.textSecondary, marginTop: 4, lineHeight: 18 },
-  divider: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing.md },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { radii, shadow, spacing } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.screenBg },
+    card: {
+      margin: spacing.md,
+      backgroundColor: c.card,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      overflow: 'hidden',
+      ...shadow.card,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      gap: spacing.md,
+    },
+    rowText: { flex: 1 },
+    label: { fontSize: 16, fontWeight: '600', color: c.textPrimary },
+    hint: { fontSize: 13, color: c.textSecondary, marginTop: 4, lineHeight: 18 },
+    divider: { height: 1, backgroundColor: c.cardBorder, marginHorizontal: spacing.md },
+  });
+}

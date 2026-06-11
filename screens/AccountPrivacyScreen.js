@@ -1,20 +1,24 @@
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../context/ThemeContext';
 
 export default function AccountPrivacyScreen({ navigation }) {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={12}>
-          <ChevronLeft size={24} color="#000000" strokeWidth={2} />
+          <ChevronLeft size={24} color={c.textPrimary} strokeWidth={2} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('account.privacy')}</Text>
         <View style={styles.headerSpacer} />
@@ -30,45 +34,48 @@ export default function AccountPrivacyScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FB',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
-    backgroundColor: '#FFFFFF',
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000000',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 44,
-  },
-  scroll: {
-    flex: 1,
-  },
-  body: {
-    padding: 20,
-  },
-  paragraph: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: '#374151',
-  },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.screenBg,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: c.cardBorder,
+      backgroundColor: c.card,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.textPrimary,
+      textAlign: 'center',
+    },
+    headerSpacer: {
+      width: 44,
+    },
+    scroll: {
+      flex: 1,
+    },
+    body: {
+      padding: 20,
+    },
+    paragraph: {
+      fontSize: 15,
+      lineHeight: 24,
+      color: c.textSecondary,
+    },
+  });
+}

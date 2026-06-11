@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -29,6 +30,9 @@ import {
 
 export default function PartnerHubScreen() {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [brandName, setBrandName] = useState('');
@@ -137,17 +141,17 @@ export default function PartnerHubScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#8140F3" />
+        <ActivityIndicator size="large" color={c.primary} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={24} color="#111827" />
+          <ChevronLeft size={24} color={c.textPrimary} />
         </Pressable>
         <Text style={styles.title}>{t('partnerHub.title')}</Text>
         <View style={styles.backBtn} />
@@ -222,51 +226,55 @@ export default function PartnerHubScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 56,
-    paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
-  },
-  backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: '#111827' },
-  scroll: { padding: 16, paddingBottom: 40 },
-  section: { fontSize: 17, fontWeight: '700', color: '#111827', marginTop: 16, marginBottom: 10 },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 10,
-    color: '#111827',
-  },
-  multiline: { minHeight: 80, textAlignVertical: 'top' },
-  btn: {
-    backgroundColor: '#8140F3',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  btnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  btnSecondary: {
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  btnSecondaryText: { color: '#111827', fontSize: 16, fontWeight: '700' },
-  scanModal: { flex: 1, backgroundColor: '#000', paddingTop: 56 },
-  scanCamera: { flex: 1 },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { radii } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.screenBg },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.screenBg },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingTop: 56,
+      paddingBottom: 12,
+      backgroundColor: c.card,
+      borderBottomWidth: 1,
+      borderBottomColor: c.cardBorder,
+    },
+    backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: c.textPrimary },
+    scroll: { padding: 16, paddingBottom: 40 },
+    section: { fontSize: 17, fontWeight: '700', color: c.textPrimary, marginTop: 16, marginBottom: 10 },
+    input: {
+      backgroundColor: c.card,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      marginBottom: 10,
+      color: c.textPrimary,
+    },
+    multiline: { minHeight: 80, textAlignVertical: 'top' },
+    btn: {
+      backgroundColor: c.primary,
+      borderRadius: radii.md,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    btnText: { color: c.onPrimary, fontSize: 16, fontWeight: '700' },
+    btnSecondary: {
+      backgroundColor: c.cardBorder,
+      borderRadius: radii.md,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    btnSecondaryText: { color: c.textPrimary, fontSize: 16, fontWeight: '700' },
+    scanModal: { flex: 1, backgroundColor: '#000', paddingTop: 56 },
+    scanCamera: { flex: 1 },
+  });
+}

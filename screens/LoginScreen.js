@@ -1,25 +1,23 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { Footprints } from 'lucide-react-native';
-import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import PrimaryButton from '../components/ui/PrimaryButton';
+import TextField from '../components/ui/TextField';
+import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginScreen({ navigation }) {
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -31,7 +29,6 @@ export default function LoginScreen({ navigation }) {
     try {
       await login(email.trim().toLowerCase(), password);
     } catch (e) {
-      console.error('Login failed', e);
       setError(e.message || t('auth.loginFailed'));
     } finally {
       setLoading(false);
@@ -39,56 +36,42 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={styles.inner}>
-        <View style={styles.logoSection}>
-          <View style={styles.logoCircle}>
-            <Footprints size={40} color="#FFFFFF" />
-          </View>
-          <Text style={styles.appName}>WalkPoint</Text>
-          <Text style={styles.tagline}>{t('auth.tagline')}</Text>
+    <View style={styles.root}>
+      <LinearGradient colors={theme.gradients.hero} style={styles.hero}>
+        <View style={styles.logoCircle}>
+          <Footprints size={40} color={c.onPrimary} />
         </View>
-
+        <Text style={styles.appName}>STRIDE</Text>
+        <Text style={styles.tagline}>{t('auth.tagline')}</Text>
+      </LinearGradient>
+      <KeyboardAvoidingView
+        style={styles.formWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.form}>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <TextInput
-            style={styles.input}
+          <TextField
             placeholder={t('auth.email')}
-            placeholderTextColor="#999"
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
           />
-          <TextInput
-            style={styles.input}
+          <TextField
             placeholder={t('auth.password')}
-            placeholderTextColor="#999"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
           />
-
-          <Pressable
-            style={[styles.button, loading && styles.buttonDisabled]}
+          <PrimaryButton
+            label={t('auth.logIn')}
+            variant="gradient"
+            loading={loading}
             onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.buttonText}>{t('auth.logIn')}</Text>
-            )}
-          </Pressable>
-
+          />
           <Pressable onPress={() => navigation.navigate('ForgotPassword')}>
             <Text style={styles.forgotText}>{t('auth.forgotPassword')}</Text>
           </Pressable>
-
           <Pressable onPress={() => navigation.navigate('Register')}>
             <Text style={styles.linkText}>
               {t('auth.signUpLink')}{' '}
@@ -96,93 +79,39 @@ export default function LoginScreen({ navigation }) {
             </Text>
           </Pressable>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FB',
-  },
-  inner: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#8140F3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#000',
-  },
-  tagline: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  form: {
-    gap: 14,
-  },
-  errorText: {
-    color: '#F44336',
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#000',
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-  button: {
-    backgroundColor: '#8140F3',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  forgotText: {
-    textAlign: 'center',
-    color: '#8140F3',
-    fontSize: 14,
-    marginTop: 16,
-    fontWeight: '600',
-  },
-  linkText: {
-    textAlign: 'center',
-    color: '#666',
-    fontSize: 14,
-    marginTop: 8,
-  },
-  linkBold: {
-    color: '#8140F3',
-    fontWeight: '700',
-  },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { typography, spacing, radii } = theme;
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.screenBg },
+    hero: {
+      paddingTop: 72,
+      paddingBottom: 40,
+      alignItems: 'center',
+      borderBottomLeftRadius: radii.xl,
+      borderBottomRightRadius: radii.xl,
+    },
+    logoCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    appName: { ...typography.titleLarge, color: c.onPrimary, fontSize: 32 },
+    tagline: { ...typography.caption, color: 'rgba(255,255,255,0.85)', marginTop: 4 },
+    formWrap: { flex: 1, justifyContent: 'center' },
+    form: { paddingHorizontal: spacing.lg, gap: 4 },
+    errorText: { ...typography.caption, color: c.danger, textAlign: 'center', marginBottom: spacing.sm },
+    forgotText: { ...typography.caption, color: c.primary, textAlign: 'center', marginTop: spacing.md, fontWeight: '600' },
+    linkText: { ...typography.caption, color: c.textMuted, textAlign: 'center', marginTop: spacing.sm },
+    linkBold: { color: c.primary, fontWeight: '700' },
+  });
+}

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "WalkPoint",
+    "name": "STRIDE",
     "slug": "MotherApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -27,7 +27,7 @@
       "minSdkVersion": 26,
       "googleServicesFile": "./app/google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#6A11CB",
+        "backgroundColor": "#8140F3",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -36,13 +36,12 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.health.READ_STEPS",
-        "ACTIVITY_RECOGNITION",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_HEIGHT",
+        "android.permission.health.READ_WEIGHT",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_HEALTH",
-        "WAKE_LOCK",
-        "RECEIVE_BOOT_COMPLETED",
         "POST_NOTIFICATIONS"
       ],
       "package": "com.walkpoint.app"
@@ -85,7 +84,6 @@
         }
       ],
       "expo-health-connect",
-      "./plugins/withBackgroundActions",
       "./plugins/withPatchGraphicsConversions",
       "./plugins/withHealthConnectPermissions",
       "./plugins/withHealthConnectMainActivity",

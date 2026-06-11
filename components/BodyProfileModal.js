@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -26,6 +27,9 @@ export default function BodyProfileModal({
   onLater,
 }) {
   const { t } = useTranslation();
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const [weightText, setWeightText] = useState('');
   const [heightText, setHeightText] = useState('');
@@ -121,7 +125,9 @@ export default function BodyProfileModal({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -172,7 +178,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryBtn: {
-    backgroundColor: '#8140F3',
+    backgroundColor: c.primary,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
@@ -189,8 +195,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryBtnText: {
-    color: '#6B7280',
+    color: c.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },
-});
+  });
+}

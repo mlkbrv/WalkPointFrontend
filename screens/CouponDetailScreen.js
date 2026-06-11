@@ -1,6 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, Download, ExternalLink, Heart, Info, Send } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { Download, ExternalLink, Heart, Info, Send } from 'lucide-react-native';
+import React, { useMemo, useState } from 'react';
+import MarketHero from '../components/market/MarketHero';
+import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -20,17 +22,11 @@ try {
 } catch (_) {}
 
 const { width } = Dimensions.get('window');
-const SPACE = { xs: 8, sm: 16, md: 24, lg: 32 };
-const CARD_SHADOW = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.12,
-  shadowRadius: 16,
-  elevation: 8,
-};
-
 export default function CouponDetailScreen({ route, navigation }) {
   const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const coupon = route.params?.coupon || {};
   const templateId = coupon.template_id ?? coupon.template;
   const [favorited, setFavorited] = useState(Boolean(coupon.is_favorite));
@@ -83,19 +79,22 @@ export default function CouponDetailScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color="#FFF" />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('couponDetail.title')}</Text>
-        {templateId ? (
-          <Pressable style={styles.headerRight} onPress={handleSave}>
-            <Heart size={22} color={favorited ? '#F44336' : '#FFF'} fill={favorited ? '#F44336' : 'transparent'} />
-          </Pressable>
-        ) : (
-          <View style={styles.headerRight} />
-        )}
-      </View>
+      <MarketHero
+        title={t('couponDetail.title')}
+        subtitle={partner}
+        onBack={() => navigation.goBack()}
+        right={
+          templateId ? (
+            <Pressable onPress={handleSave} hitSlop={8}>
+              <Heart
+                size={22}
+                color={favorited ? c.danger : c.onPrimary}
+                fill={favorited ? c.danger : 'transparent'}
+              />
+            </Pressable>
+          ) : null
+        }
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -105,7 +104,7 @@ export default function CouponDetailScreen({ route, navigation }) {
         <View style={styles.mainCard}>
           <View style={styles.cardTop}>
             <View style={styles.brandRow}>
-              <View style={[styles.brandLogo, { backgroundColor: '#E31837' }]}>
+              <View style={[styles.brandLogo, { backgroundColor: c.primary }]}>
                 <Text style={styles.brandText}>{partner.charAt(0)}</Text>
               </View>
               <View style={styles.offerCol}>
@@ -160,54 +159,40 @@ export default function CouponDetailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme) {
+  const c = theme.colors;
+  const { spacing, radii, typography } = theme;
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACE.sm,
-    paddingTop: 50,
-    paddingBottom: SPACE.sm,
-    backgroundColor: '#8140F3',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  headerRight: {
-    width: 40,
+    backgroundColor: c.primary,
   },
   scroll: {
     flex: 1,
+    backgroundColor: c.screenBg,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    marginTop: 8,
   },
   scrollContent: {
-    padding: SPACE.sm,
-    paddingBottom: SPACE.lg + 24,
+    padding: spacing.md,
+    paddingBottom: spacing.xl + 24,
   },
   mainCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
+    backgroundColor: c.card,
+    borderRadius: radii.lg,
     overflow: 'hidden',
-    padding: SPACE.sm,
-    ...CARD_SHADOW,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    ...theme.shadow.card,
   },
   cardTop: {
-    marginBottom: SPACE.sm,
+    marginBottom: spacing.sm,
   },
   brandRow: {
     flexDirection: 'row',
-    marginBottom: SPACE.sm,
+    marginBottom: spacing.sm,
   },
   brandLogo: {
     width: 56,
@@ -215,7 +200,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACE.sm,
+    marginRight: spacing.sm,
   },
   brandText: {
     fontSize: 24,
@@ -226,25 +211,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   offerTitle: {
+    ...typography.subtitle,
     fontSize: 20,
-    fontWeight: '800',
-    color: '#111',
+    color: c.textPrimary,
     marginBottom: 4,
   },
   offerPartner: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4b5563',
+    ...typography.caption,
+    color: c.textSecondary,
     marginBottom: 6,
   },
   offerDesc: {
+    ...typography.body,
     fontSize: 13,
-    fontWeight: '500',
-    color: '#6b7280',
-    lineHeight: 20,
+    color: c.textMuted,
   },
   terms: {
-    marginTop: SPACE.xs,
+    marginTop: spacing.xs,
   },
   term: {
     fontSize: 12,
@@ -257,19 +240,19 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderBottomWidth: 1,
     borderColor: '#E5E7EB',
-    marginVertical: SPACE.sm,
+    marginVertical: spacing.sm,
   },
   cardBottom: {
     alignItems: 'center',
   },
   qrCard: {
-    padding: SPACE.md,
-    backgroundColor: '#FFF',
-    borderRadius: 16,
+    padding: spacing.md,
+    backgroundColor: c.card,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: SPACE.sm,
-    ...CARD_SHADOW,
+    borderColor: c.cardBorder,
+    marginBottom: spacing.sm,
+    ...theme.shadow.card,
   },
   qrPlaceholder: {
     backgroundColor: '#F3F4F6',
@@ -292,41 +275,38 @@ const styles = StyleSheet.create({
   validRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACE.xs,
+    gap: spacing.xs,
   },
   validText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#9ca3af',
+    ...typography.caption,
+    color: c.textMuted,
   },
   usageTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginTop: SPACE.md,
-    marginBottom: SPACE.xs,
+    ...typography.caption,
+    color: c.textSecondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   usagePara: {
+    ...typography.body,
     fontSize: 13,
-    fontWeight: '400',
-    color: '#9ca3af',
-    lineHeight: 20,
-    paddingHorizontal: SPACE.xs,
+    color: c.textMuted,
+    paddingHorizontal: spacing.xs,
   },
   actions: {
     flexDirection: 'row',
-    gap: SPACE.sm,
-    marginTop: SPACE.md,
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   saveBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#B39DDB',
-    paddingVertical: SPACE.sm,
-    borderRadius: 16,
-    gap: SPACE.xs,
+    backgroundColor: c.primaryLight,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    gap: spacing.xs,
   },
   saveBtnText: {
     fontSize: 16,
@@ -338,14 +318,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#8140F3',
-    paddingVertical: SPACE.sm,
-    borderRadius: 16,
-    gap: SPACE.xs,
+    backgroundColor: c.primary,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    gap: spacing.xs,
   },
   shareBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
+    color: c.onPrimary,
   },
-});
+  });
+}

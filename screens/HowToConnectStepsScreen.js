@@ -11,9 +11,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '../context/ThemeContext';
 
 export default function HowToConnectStepsScreen({ navigation }) {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
   const steps = useMemo(() => {
@@ -27,17 +31,17 @@ export default function HowToConnectStepsScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ChevronLeft size={24} color="#000000" strokeWidth={2} />
+          <ChevronLeft size={24} color={c.textPrimary} strokeWidth={2} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('howTo.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.iconWrapper}>
-          <Footprints size={48} color="#8140F3" strokeWidth={2} />
+          <Footprints size={48} color={c.primary} strokeWidth={2} />
         </View>
         <Text style={styles.subtitle}>
           {Platform.OS === 'android' ? t('howTo.subtitleAndroid') : t('howTo.subtitleIos')}
@@ -60,85 +64,88 @@ export default function HowToConnectStepsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FB',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000000',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  iconWrapper: {
-    alignSelf: 'center',
-    marginTop: 24,
-    marginBottom: 16,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  stepsList: {
-    gap: 14,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#EDE7F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepNumberText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#5E35B1',
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#333',
-  },
-  footer: {
-    marginTop: 28,
-    fontSize: 13,
-    lineHeight: 20,
-    color: '#888',
-    textAlign: 'center',
-  },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.screenBg,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: c.card,
+      borderBottomWidth: 1,
+      borderBottomColor: c.cardBorder,
+    },
+    backButton: {
+      padding: 8,
+      marginLeft: -8,
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.textPrimary,
+      textAlign: 'center',
+    },
+    headerSpacer: {
+      width: 40,
+    },
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingBottom: 40,
+    },
+    iconWrapper: {
+      alignSelf: 'center',
+      marginTop: 24,
+      marginBottom: 16,
+    },
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: c.textSecondary,
+      textAlign: 'center',
+      marginBottom: 24,
+    },
+    stepsList: {
+      gap: 14,
+    },
+    stepRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    stepNumber: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: c.primarySoft,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    stepNumberText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: c.primaryDark,
+    },
+    stepText: {
+      flex: 1,
+      fontSize: 15,
+      lineHeight: 22,
+      color: c.textPrimary,
+    },
+    footer: {
+      marginTop: 28,
+      fontSize: 13,
+      lineHeight: 20,
+      color: c.textMuted,
+      textAlign: 'center',
+    },
+  });
+}

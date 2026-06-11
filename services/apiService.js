@@ -4,7 +4,7 @@ import { stepConvertAuthFields } from '../utils/stepSignature';
 
 const PROD_API = 'https://walkpoint-backend.onrender.com/api';
 
-const DEV_API_HOST = '192.168.0.165';
+const DEV_API_HOST = process.env.EXPO_PUBLIC_DEV_API_HOST || '192.168.0.165';
 
 const API_BASE_URL = __DEV__
   ? Platform.select({
@@ -241,6 +241,56 @@ export const buyCoupon = async (templateId) => {
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || 'Purchase failed');
   return data;
+};
+
+export const buyCouponWithSteps = async (templateId, date) => {
+  const body = { template_id: templateId };
+  if (date) body.date = date;
+  const res = await apiFetch('/market/buy-with-steps/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Purchase failed');
+  return data;
+};
+
+export const verifyCoupon = async (couponId) => {
+  const res = await apiFetch(`/market/coupons/${couponId}/verify/`, { method: 'POST', body: '{}' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Verification failed');
+  return data;
+};
+
+export const getBrands = async (featured) => {
+  const path = featured ? '/partners/brands/?featured=true' : '/partners/brands/';
+  const res = await apiFetch(path);
+  if (!res.ok) throw new Error('Failed to load brands');
+  return res.json();
+};
+
+export const getBrand = async (brandId) => {
+  const res = await apiFetch(`/partners/brands/${brandId}/`);
+  if (!res.ok) throw new Error('Failed to load brand');
+  return res.json();
+};
+
+export const getNotifications = async () => {
+  const res = await apiFetch('/notifications/');
+  if (!res.ok) throw new Error('Failed to load notifications');
+  return res.json();
+};
+
+export const markAllNotificationsRead = async () => {
+  const res = await apiFetch('/notifications/read-all/', { method: 'POST', body: '{}' });
+  if (!res.ok) throw new Error('Failed to mark notifications read');
+  return res.json();
+};
+
+export const markNotificationRead = async (id) => {
+  const res = await apiFetch(`/notifications/${id}/read/`, { method: 'PATCH', body: '{}' });
+  if (!res.ok) throw new Error('Failed to mark notification read');
+  return res.json();
 };
 
 export const getMyCoupons = async () => {

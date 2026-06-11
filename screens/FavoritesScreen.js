@@ -1,15 +1,18 @@
 import { StatusBar } from 'expo-status-bar';
 import { Heart } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import ScreenHeader from '../components/ui/ScreenHeader';
-import { colors, radii, shadow, spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { getFavoriteCoupons } from '../services/apiService';
 
 export default function FavoritesScreen() {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,10 +29,10 @@ export default function FavoritesScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScreenHeader title={t('features.favorites')} onBack={() => navigation.goBack()} />
       {loading ? (
-        <ActivityIndicator style={styles.loader} color={colors.primary} />
+        <ActivityIndicator style={styles.loader} color={c.primary} />
       ) : (
         <FlatList
           data={rows}
@@ -41,7 +44,7 @@ export default function FavoritesScreen() {
               onPress={() => navigation.navigate('CouponDetail', { coupon: item })}
             >
               <View style={styles.heart}>
-                <Heart size={18} color="#EF4444" fill="#FEE2E2" />
+                <Heart size={18} color={c.danger} fill={c.dangerSoft} />
               </View>
               <View style={styles.rowBody}>
                 <Text style={styles.titleText}>{item.title}</Text>
@@ -52,7 +55,7 @@ export default function FavoritesScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Heart size={40} color={colors.textMuted} />
+              <Heart size={40} color={c.textMuted} />
               <Text style={styles.empty}>{t('favorites.empty')}</Text>
             </View>
           }
@@ -62,34 +65,38 @@ export default function FavoritesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  loader: { marginTop: 48 },
-  list: { padding: spacing.md, paddingBottom: spacing.xl },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.md,
-    ...shadow.card,
-  },
-  heart: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.sm,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowBody: { flex: 1 },
-  titleText: { fontSize: 16, fontWeight: '700', color: colors.text },
-  sub: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  price: { fontSize: 15, fontWeight: '800', color: colors.primary },
-  emptyWrap: { alignItems: 'center', marginTop: 48, gap: spacing.sm },
-  empty: { color: colors.textSecondary, fontSize: 15 },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { radii, shadow, spacing } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.screenBg },
+    loader: { marginTop: 48 },
+    list: { padding: spacing.md, paddingBottom: spacing.xl },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.card,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      gap: spacing.md,
+      ...shadow.card,
+    },
+    heart: {
+      width: 40,
+      height: 40,
+      borderRadius: radii.sm,
+      backgroundColor: c.dangerSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rowBody: { flex: 1 },
+    titleText: { fontSize: 16, fontWeight: '700', color: c.textPrimary },
+    sub: { fontSize: 13, color: c.textSecondary, marginTop: 2 },
+    price: { fontSize: 15, fontWeight: '800', color: c.primary },
+    emptyWrap: { alignItems: 'center', marginTop: 48, gap: spacing.sm },
+    empty: { color: c.textSecondary, fontSize: 15 },
+  });
+}

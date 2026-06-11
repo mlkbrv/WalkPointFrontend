@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Platform, View } from 'react-native';
 import BodyProfileModal from '../components/BodyProfileModal';
+import { useTheme } from './ThemeContext';
 import { useHealthData } from '../hooks/useHealthData';
 import {
   convertSteps as apiConvertSteps,
@@ -16,13 +17,7 @@ import {
   serverStatToLocal,
   syncActivityStatsFromServer,
 } from '../services/activitySync';
-import {
-  getNativeTodayStatsSafe,
-  isNativeStepCounterSupported,
-  startNativeStepTracking,
-} from '../services/nativeStepCounter';
-
-const STORAGE_NATIVE_SENSOR_HC_BYPASS = 'walkpoint_native_sensor_hc_onboarding_bypass';
+import { DESIGN_PREVIEW } from '../constants/designPreview';
 import * as healthService from '../services/healthService';
 import {
   calculateDistanceFromSteps,
@@ -86,7 +81,6 @@ const DEFAULT_APP_VALUE = {
   healthConnectReady: false,
   useHealthConnect: false,
   initHealthConnect: async () => false,
-  continueWithNativeSensorWithoutHc: async () => false,
   requestHealthConnectPermission: async () => false,
   openHealthConnectSettings: () => {},
   openSamsungHealth: async () => {},
@@ -113,6 +107,8 @@ const AppContext = createContext(DEFAULT_APP_VALUE);
 export const useApp = () => useContext(AppContext) ?? DEFAULT_APP_VALUE;
 
 export const AppProvider = ({ children }) => {
+  const { theme } = useTheme();
+  const c = theme.colors;
   const [stepCount, setStepCount] = useState(0);
   const [isTracking, setIsTracking] = useState(false);
   const [trackingStartTime, setTrackingStartTime] = useState(null);
@@ -147,22 +143,17 @@ export const AppProvider = ({ children }) => {
   const activityPushTimerRef = useRef(null);
   const resetDailyStatsForNewDayRef = useRef(async (_previousDateKey) => {});
   const syncStepsInFlightRef = useRef(false);
-  const interruptAlertShownRef = useRef(false);
   const rolloverInProgressRef = useRef(false);
-  const [activityPermissionGranted, setActivityPermissionGranted] = useState(true); // Always true now
+  const [activityPermissionGranted, setActivityPermissionGranted] = useState(true);
   const [isBackgroundServiceRunning] = useState(false);
-  const [nativeSensorHcBypass, setNativeSensorHcBypass] = useState(false);
+  const [todayMetrics, setTodayMetrics] = useState({
+    steps: 0,
+    distanceM: 0,
+    activeCalories: 0,
+    activeMinutes: 0,
+  });
 
   const healthData = useHealthData();
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const v = await AsyncStorage.getItem(STORAGE_NATIVE_SENSOR_HC_BYPASS);
-        if (v === '1') setNativeSensorHcBypass(true);
-      } catch (_) {}
-    })();
-  }, []);
 
   const refreshBodyProfileFromHealth = useCallback(async () => {
     if (!healthData.isReady) return;
@@ -317,14 +308,16 @@ export const AppProvider = ({ children }) => {
   const [walletBalance, setWalletBalance] = useState('0.00');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Steps: Android native pedometer (foreground service) first, else Health Connect; iOS: HealthKit.
   const requestActivityPermission = useCallback(async () => {
     setActivityPermissionGranted(true);
     return true;
   }, []);
 
   const syncStepsFromSystem = useCallback(async () => {
+    if (DESIGN_PREVIEW) return;
     if (syncStepsInFlightRef.current) return;
+    if (Platform.OS === 'android' && healthData.healthConnectAvailable === null) return;
+    if (!healthData.isReady) return;
     syncStepsInFlightRef.current = true;
     try {
       const dateKey = getDateKey();
@@ -338,92 +331,41 @@ export const AppProvider = ({ children }) => {
         date: dateKey,
       };
 
-      let systemStepsToday = 0;
-      let usedHealthNative = false;
-      let usedAndroidPedometer = false;
-      let activeWalkingMs = 0;
-
-      if (Platform.OS === 'android') {
-        const nativeStats = getNativeTodayStatsSafe();
-        if (nativeStats && isNativeStepCounterSupported() && nativeStats.tracking) {
-          systemStepsToday = Number(nativeStats.steps) || 0;
-          usedAndroidPedometer = true;
-          activeWalkingMs = Number(nativeStats.activeWalkingMs) || 0;
-
-          if (nativeStats.trackingInterrupted && !interruptAlertShownRef.current) {
-            interruptAlertShownRef.current = true;
-            Alert.alert(
-              i18n.t('nativeSteps.interruptTitle'),
-              i18n.t('nativeSteps.interruptMessage'),
-              [{ text: i18n.t('common.ok') }],
-            );
-          }
-          if (!nativeStats.trackingInterrupted) {
-            interruptAlertShownRef.current = false;
-          }
-        }
-
-        if (!usedAndroidPedometer) {
-          if (healthData.healthConnectAvailable === null) return;
-
-          try {
-            if (healthData.healthConnectAvailable === true && healthData.isReady) {
-              const hcSteps = await healthData.getTodaySteps();
-              if (hcSteps > 0) console.log('Health Connect steps today:', hcSteps);
-              systemStepsToday = hcSteps || 0;
-              usedHealthNative = true;
-            }
-          } catch (err) {
-            console.warn('Health Connect sync failed:', err?.message ?? err);
-            systemStepsToday = 0;
-          }
-        }
-      } else if (Platform.OS === 'ios') {
-        if (healthData.isReady) {
-          try {
-            systemStepsToday = await healthData.getTodaySteps();
-            usedHealthNative = true;
-            console.log('iOS HealthKit steps today:', systemStepsToday);
-          } catch (err) {
-            console.warn('HealthKit step count failed:', err?.message ?? err);
-          }
-        }
+      let metrics = { steps: 0, distanceM: 0, activeCalories: 0, activeMinutes: 0 };
+      try {
+        metrics = await healthData.getTodayMetrics();
+      } catch (err) {
+        console.warn('Health metrics sync failed:', err?.message ?? err);
       }
+
+      const systemStepsToday = Math.max(0, Math.floor(metrics.steps || 0));
+      setTodayMetrics(metrics);
 
       await refreshBodyProfileFromHealth();
 
       if (systemStepsToday <= 0) return;
 
       const prevSteps = currentStats.steps || 0;
-
-      if (!usedAndroidPedometer && systemStepsToday <= prevSteps) {
-        console.log('No new steps:', systemStepsToday, 'vs saved', prevSteps);
+      if (systemStepsToday <= prevSteps) {
         return;
       }
-      if (usedAndroidPedometer && systemStepsToday === prevSteps) {
-        return;
-      }
-
-      console.log('Updating steps from system:', prevSteps, '->', systemStepsToday);
 
       const w = bodyProfileRef.current.weightKg;
       const h = bodyProfileRef.current.heightCm;
-      const newCalories = calculateWalkingCaloriesFromSteps(systemStepsToday, w, h);
-      const newDistance = calculateDistanceFromSteps(systemStepsToday, h);
+      const newCalories =
+        metrics.activeCalories > 0
+          ? metrics.activeCalories
+          : calculateWalkingCaloriesFromSteps(systemStepsToday, w, h);
+      const newDistance =
+        metrics.distanceM > 0
+          ? metrics.distanceM / 1000
+          : calculateDistanceFromSteps(systemStepsToday, h);
+      const newTime =
+        metrics.activeMinutes > 0
+          ? metrics.activeMinutes
+          : Math.max(1, Math.round(systemStepsToday / 100));
 
-      const cadenceMin = Math.round(systemStepsToday / 100);
-      const walkMinFromSensor =
-        activeWalkingMs > 0 ? Math.max(1, Math.round(activeWalkingMs / 60000)) : 0;
-      const newTime = Math.max(cadenceMin, walkMinFromSensor);
-
-      let activitySource = 'unknown';
-      if (Platform.OS === 'ios' && usedHealthNative) {
-        activitySource = 'ios_health';
-      } else if (Platform.OS === 'android' && usedAndroidPedometer) {
-        activitySource = 'pedometer';
-      } else if (Platform.OS === 'android' && usedHealthNative) {
-        activitySource = 'health_connect';
-      }
+      const activitySource = Platform.OS === 'ios' ? 'ios_health' : 'health_connect';
 
       const updatedStats = {
         ...currentStats,
@@ -463,24 +405,11 @@ export const AppProvider = ({ children }) => {
     }
   }, [
     healthData.isReady,
-    healthData.getTodaySteps,
+    healthData.getTodayMetrics,
     healthData.healthConnectAvailable,
     pushActivityToBackend,
     refreshBodyProfileFromHealth,
   ]);
-
-  const continueWithNativeSensorWithoutHc = useCallback(async () => {
-    if (Platform.OS !== 'android') return false;
-    const ok = await startNativeStepTracking();
-    if (ok) {
-      try {
-        await AsyncStorage.setItem(STORAGE_NATIVE_SENSOR_HC_BYPASS, '1');
-      } catch (_) {}
-      setNativeSensorHcBypass(true);
-      await syncStepsFromSystem();
-    }
-    return ok;
-  }, [syncStepsFromSystem]);
 
   const saveUserBodyProfile = useCallback(
     async (weightKg, heightCm) => {
@@ -891,12 +820,12 @@ export const AppProvider = ({ children }) => {
   const startStepTracking = async () => {
     if (isTracking) return true;
 
+    if (!healthData.isReady && healthData.isAvailable) {
+      await healthData.init();
+    }
+
     setIsTracking(true);
     setTrackingStartTime(new Date());
-
-    if (Platform.OS === 'android' && isNativeStepCounterSupported()) {
-      await startNativeStepTracking();
-    }
 
     syncStepsFromSystem();
     syncIntervalRef.current = setInterval(syncStepsFromSystem, FOREGROUND_SYNC_INTERVAL_MS);
@@ -1053,7 +982,6 @@ export const AppProvider = ({ children }) => {
     healthConnectReady: healthData.isReady,
     useHealthConnect: healthData.isAvailable,
     initHealthConnect: healthData.init,
-    continueWithNativeSensorWithoutHc,
     requestHealthConnectPermission: healthData.retryInit,
     openHealthConnectSettings: healthData.openSettings,
     openSamsungHealth: healthData.openSamsungHealth,
@@ -1062,6 +990,9 @@ export const AppProvider = ({ children }) => {
     refreshHealthConnectStatus: healthData.refreshHealthConnectStatus,
     healthConnectPlayUrl: healthData.healthConnectPlayUrl,
     syncStepsFromSystem,
+    todayMetrics,
+    availableSteps: dailyStats?.steps ?? 0,
+    getStepsHistory: healthData.getStepsHistory,
     // background service (disabled)
     isBackgroundServiceRunning,
     startBackgroundService: async () => {},
@@ -1080,8 +1011,8 @@ export const AppProvider = ({ children }) => {
   if (healthData.isCheckingHealthConnect) {
     return (
       <AppContext.Provider value={value}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}>
-          <ActivityIndicator size="large" color="#8140F3" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.screenBg }}>
+          <ActivityIndicator size="large" color={c.primary} />
         </View>
       </AppContext.Provider>
     );
@@ -1089,25 +1020,20 @@ export const AppProvider = ({ children }) => {
   // 1) HC not installed → install screen
   // 2) HC installed but no permission → onboarding "Подключить шаги" (skip on Android if hardware step counter exists)
   // 3) else → main app
-  const skipHcOnboardingForAndroidSensor =
-    Platform.OS === 'android' && isNativeStepCounterSupported();
-
   const showStepsOnboarding =
     healthData.isAvailable &&
-    healthData.healthConnectAvailable === true &&
-    !healthData.isReady &&
-    (Platform.OS === 'android' || Platform.OS === 'ios') &&
-    !skipHcOnboardingForAndroidSensor &&
-    !nativeSensorHcBypass;
+    (Platform.OS === 'ios' ||
+      (Platform.OS === 'android' && healthData.healthConnectAvailable === true)) &&
+    !healthData.isReady;
 
   return (
     <AppContext.Provider value={value}>
       {healthData.needsHealthConnectScreen ? (
-        <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}><ActivityIndicator size="large" color="#8140F3" /></View>}>
+        <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.screenBg }}><ActivityIndicator size="large" color={c.primary} /></View>}>
           <HealthConnectRequiredScreen />
         </Suspense>
       ) : showStepsOnboarding ? (
-        <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FB' }}><ActivityIndicator size="large" color="#8140F3" /></View>}>
+        <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.screenBg }}><ActivityIndicator size="large" color={c.primary} /></View>}>
           <StepsOnboardingScreen />
         </Suspense>
       ) : (

@@ -1,9 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Clock, Flame, Footprints, MapPin } from 'lucide-react-native';
+import { Clock, Flame, Footprints, MapPin } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { getDateKey } from '../utils/calculations';
 import { buildRouteMapHtml } from '../utils/routeMapHtml';
 
@@ -48,6 +50,9 @@ function normalizeHistoryDateKey(item) {
 
 function HistoryScreen() {
   const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { trackingHistory, getHistoricalStats, syncActivityHistory } = useApp();
   const localeTag = i18n.language === 'ru' ? 'ru-RU' : 'en-US';
   const [archivedDaily, setArchivedDaily] = useState([]);
@@ -142,18 +147,18 @@ function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Footprints size={24} color="#8140F3" />
+            <Footprints size={24} color={c.primary} />
           </View>
           <Text style={styles.headerTitle}>{t('history.title')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#8140F3" style={{ marginTop: 48 }} />
+          <ActivityIndicator color={c.primary} style={{ marginTop: 48 }} />
         ) : Object.keys(groupedHistory).length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>{t('history.empty')}</Text>
@@ -225,7 +230,7 @@ function HistoryScreen() {
           {detail && Array.isArray(detail.route) && detail.route.length > 1 ? (
             <WebView
               style={styles.map}
-              source={{ html: buildRouteMapHtml(detail.route) }}
+              source={{ html: buildRouteMapHtml(detail.route, 55.75, 37.62, c.primary) }}
               scrollEnabled={false}
             />
           ) : null}
@@ -248,125 +253,128 @@ function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FB',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
-  },
-  logoContainer: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 30,
-    height: 30,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 100,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#666666',
-    marginBottom: 10,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999999',
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    fontWeight: '500',
-  },
-  dateSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  dateHeader: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 16,
-  },
-  historyItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  historyStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  historyStat: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  historyValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000000',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  historyLabel: {
-    fontSize: 12,
-    color: '#666666',
-    fontWeight: '500',
-  },
-  routeBadgeWrap: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#F3E8FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  routeBadge: {
-    color: '#6B2FD9',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  modal: { flex: 1, backgroundColor: '#FFF', paddingTop: 48 },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalClose: { color: '#8140F3', fontWeight: '600' },
-  map: { height: 280, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden' },
-  modalStats: { padding: 20, gap: 8 },
-  modalStat: { fontSize: 16, color: '#374151' },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.screenBg,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 50,
+      paddingBottom: 20,
+    },
+    logoContainer: {
+      width: 30,
+      height: 30,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: c.textPrimary,
+      flex: 1,
+      textAlign: 'center',
+    },
+    headerSpacer: {
+      width: 30,
+      height: 30,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 100,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.textSecondary,
+      marginBottom: 10,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: c.textMuted,
+      textAlign: 'center',
+      paddingHorizontal: 40,
+      fontWeight: '500',
+    },
+    dateSection: {
+      paddingHorizontal: 20,
+      marginBottom: 24,
+    },
+    dateHeader: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: c.textPrimary,
+      marginBottom: 16,
+    },
+    historyItem: {
+      backgroundColor: c.card,
+      borderRadius: 24,
+      padding: 20,
+      marginBottom: 12,
+      shadowColor: c.shadowColor,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    historyStats: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+    },
+    historyStat: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    historyValue: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: c.textPrimary,
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    historyLabel: {
+      fontSize: 12,
+      color: c.textSecondary,
+      fontWeight: '500',
+    },
+    routeBadgeWrap: {
+      alignSelf: 'flex-start',
+      backgroundColor: c.primarySoft,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+      marginBottom: 10,
+    },
+    routeBadge: {
+      color: c.primaryDark,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    modal: { flex: 1, backgroundColor: c.card, paddingTop: 48 },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingBottom: 12,
+    },
+    modalTitle: { fontSize: 18, fontWeight: '700', color: c.textPrimary },
+    modalClose: { color: c.primary, fontWeight: '600' },
+    map: { height: 280, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden' },
+    modalStats: { padding: 20, gap: 8 },
+    modalStat: { fontSize: 16, color: c.textSecondary },
+  });
+}
 
 export default React.memo(HistoryScreen);

@@ -1,7 +1,8 @@
 import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { Clock, Flame, Footprints, MapPin, MoreVertical } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import {
   Alert,
   Dimensions,
@@ -20,6 +21,9 @@ const { width, height } = Dimensions.get('window');
 
 export default function TrackScreen() {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const {
     dailyStats,
@@ -133,7 +137,21 @@ export default function TrackScreen() {
       };
       addTrackingSession(session);
       setCurrentRoute(routeCoordinates);
-      
+
+      const durationSec = Math.floor((new Date() - trackingStartTime) / 1000);
+      const h = Math.floor(durationSec / 3600);
+      const m = Math.floor((durationSec % 3600) / 60);
+      const s = durationSec % 60;
+      navigation.getParent()?.getParent()?.navigate('WorkoutSummary', {
+        workout: {
+          name: t('track.morningRoute'),
+          duration: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`,
+          distance: Number(routeDistance || session.distance || 0).toFixed(2),
+          calories: session.calories,
+          tokensEarned: Math.max(50, Math.round(session.steps / 20)),
+        },
+      });
+
       // Draw route on map
       if (webViewRef.current && routeCoordinates.length > 0) {
         const routePoints = routeCoordinates.map(c => `[${c.latitude}, ${c.longitude}]`).join(', ');
@@ -143,7 +161,7 @@ export default function TrackScreen() {
           }
           if (window.map) {
             window.routeLayer = L.polyline([${routePoints}], {
-              color: '#8140F3',
+              color: '${c.primary}',
               weight: 4,
               opacity: 0.8
             }).addTo(window.map);
@@ -213,17 +231,20 @@ export default function TrackScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-          <Footprints size={24} color="#8140F3" />
+          <Footprints size={24} color={c.primary} />
         </View>
         <Text style={styles.headerTitle}>{t('tabs.track')}</Text>
         <Pressable
           style={styles.menuButton}
-          onPress={() => navigation.navigate('Report', { screen: 'History' })}
+          onPress={() => {
+            const parent = navigation.getParent();
+            if (parent) parent.navigate('Home', { screen: 'History' });
+          }}
         >
           <MoreVertical size={20} color="#000000" />
         </Pressable>
@@ -295,10 +316,12 @@ export default function TrackScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: c.screenBg,
   },
   header: {
     flexDirection: 'row',
@@ -307,7 +330,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: c.screenBg,
   },
   logoContainer: {
     width: 30,
@@ -400,11 +423,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   stopButton: {
-    backgroundColor: '#8140F3',
+    backgroundColor: c.primary,
     paddingVertical: 18,
     borderRadius: 24,
     alignItems: 'center',
-    shadowColor: '#8140F3',
+    shadowColor: c.shadowPrimary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
@@ -415,8 +438,9 @@ const styles = StyleSheet.create({
     shadowColor: '#F44336',
   },
   stopButtonText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontSize: 18,
     fontWeight: '700',
   },
-});
+  });
+}

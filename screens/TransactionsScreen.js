@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { ChevronLeft } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
 import { getTransactions } from '../services/apiService';
 
 const TYPE_LABELS = {
@@ -22,6 +23,9 @@ const TYPE_LABELS = {
 
 export default function TransactionsScreen() {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,16 +74,16 @@ export default function TransactionsScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={24} color="#111827" />
+          <ChevronLeft size={24} color={c.textPrimary} />
         </Pressable>
         <Text style={styles.title}>{t('transactions.title')}</Text>
         <View style={styles.backBtn} />
       </View>
       {loading ? (
-        <ActivityIndicator style={styles.loader} color="#8140F3" />
+        <ActivityIndicator style={styles.loader} color={c.primary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
@@ -95,37 +99,41 @@ export default function TransactionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingTop: 56,
-    paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
-  },
-  backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: '#111827' },
-  loader: { marginTop: 40 },
-  error: { color: '#DC2626', textAlign: 'center', marginTop: 24, paddingHorizontal: 20 },
-  list: { padding: 16, paddingBottom: 32 },
-  listEmpty: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  empty: { textAlign: 'center', color: '#6B7280', fontSize: 15 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
-  },
-  rowMain: { flex: 1 },
-  rowTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  rowDate: { fontSize: 13, color: '#6B7280', marginTop: 4 },
-  rowAmount: { fontSize: 17, fontWeight: '700' },
-  positive: { color: '#059669' },
-  negative: { color: '#DC2626' },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { radii } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.screenBg },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingTop: 56,
+      paddingBottom: 12,
+      backgroundColor: c.card,
+      borderBottomWidth: 1,
+      borderBottomColor: c.cardBorder,
+    },
+    backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: c.textPrimary },
+    loader: { marginTop: 40 },
+    error: { color: c.danger, textAlign: 'center', marginTop: 24, paddingHorizontal: 20 },
+    list: { padding: 16, paddingBottom: 32 },
+    listEmpty: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    empty: { textAlign: 'center', color: c.textSecondary, fontSize: 15 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.card,
+      borderRadius: radii.md,
+      padding: 16,
+      marginBottom: 10,
+    },
+    rowMain: { flex: 1 },
+    rowTitle: { fontSize: 16, fontWeight: '600', color: c.textPrimary },
+    rowDate: { fontSize: 13, color: c.textSecondary, marginTop: 4 },
+    rowAmount: { fontSize: 17, fontWeight: '700' },
+    positive: { color: c.success },
+    negative: { color: c.danger },
+  });
+}

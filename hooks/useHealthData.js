@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AppState, Platform } from 'react-native';
+import { DESIGN_PREVIEW } from '../constants/designPreview';
 import * as healthService from '../services/healthService';
 
 const HEALTH_CONNECT_PLAY_URL = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata';
@@ -9,10 +10,12 @@ const STORAGE_KEY_HEALTH_READY = 'healthConnectReady';
 
 export function useHealthData() {
   const { t } = useTranslation();
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(DESIGN_PREVIEW);
   const [error, setError] = useState(null);
-  const [statusChecked, setStatusChecked] = useState(false);
-  const [healthConnectAvailable, setHealthConnectAvailable] = useState(null);
+  const [statusChecked, setStatusChecked] = useState(DESIGN_PREVIEW);
+  const [healthConnectAvailable, setHealthConnectAvailable] = useState(
+    DESIGN_PREVIEW ? false : null,
+  );
   const initRef = useRef(false);
   const restoredRef = useRef(false);
   const isReadyRef = useRef(false);
@@ -44,15 +47,22 @@ export function useHealthData() {
     }
   }, [isAvailable]);
 
-  const needsHealthConnectScreen = false;
+  const needsHealthConnectScreen =
+    !DESIGN_PREVIEW &&
+    Platform.OS === 'android' &&
+    isAvailable &&
+    statusChecked &&
+    healthConnectAvailable === false;
 
   useEffect(() => {
+    if (DESIGN_PREVIEW) return;
     if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
     checkStatusOnce();
   }, [checkStatusOnce]);
 
   // Restore Android Health Connect: granted Steps read
   useEffect(() => {
+    if (DESIGN_PREVIEW) return;
     if (Platform.OS !== 'android' || !isAvailable || !statusChecked || healthConnectAvailable !== true || restoredRef.current) return;
     (async () => {
       try {
@@ -83,6 +93,7 @@ export function useHealthData() {
 
   // Restore iOS HealthKit after reinstall / cold start
   useEffect(() => {
+    if (DESIGN_PREVIEW) return;
     if (Platform.OS !== 'ios' || !isAvailable || !statusChecked || healthConnectAvailable !== true || restoredRef.current) return;
     (async () => {
       try {
@@ -125,11 +136,13 @@ export function useHealthData() {
   }, [isAvailable, healthConnectAvailable]);
 
   useEffect(() => {
+    if (DESIGN_PREVIEW) return;
     if (Platform.OS !== 'android' || !statusChecked || healthConnectAvailable !== true || !isAvailable) return;
     tryAdoptGrantedStepsFromSystem();
   }, [statusChecked, healthConnectAvailable, isAvailable, tryAdoptGrantedStepsFromSystem]);
 
   useEffect(() => {
+    if (DESIGN_PREVIEW) return;
     if ((Platform.OS !== 'android' && Platform.OS !== 'ios') || !statusChecked) return;
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
@@ -141,6 +154,7 @@ export function useHealthData() {
   }, [statusChecked, checkStatusOnce, tryAdoptGrantedStepsFromSystem]);
 
   const init = useCallback(async () => {
+    if (DESIGN_PREVIEW) return true;
     if (!isAvailable) return false;
     if (isReadyRef.current) return true;
 
@@ -254,6 +268,33 @@ export function useHealthData() {
     }
   }, [isAvailable, isReady]);
 
+  const getTodayMetrics = useCallback(async () => {
+    if (!isAvailable) {
+      return { steps: 0, distanceM: 0, activeCalories: 0, activeMinutes: 0 };
+    }
+    if ((Platform.OS === 'android' || Platform.OS === 'ios') && !isReady) {
+      return { steps: 0, distanceM: 0, activeCalories: 0, activeMinutes: 0 };
+    }
+    try {
+      return await healthService.getDailyMetrics();
+    } catch (error) {
+      console.warn('Health metrics not available:', error?.message ?? error);
+      return { steps: 0, distanceM: 0, activeCalories: 0, activeMinutes: 0 };
+    }
+  }, [isAvailable, isReady]);
+
+  const getStepsHistory = useCallback(
+    async (days = 7) => {
+      if (!isAvailable || !isReady) return [];
+      try {
+        return await healthService.getStepsHistory(days);
+      } catch {
+        return [];
+      }
+    },
+    [isAvailable, isReady],
+  );
+
   const openSettings = useCallback(() => {
     healthService.openSettings();
   }, []);
@@ -275,12 +316,15 @@ export function useHealthData() {
     init,
     retryInit,
     getTodaySteps,
+    getTodayMetrics,
+    getStepsHistory,
     requestPermissions,
     openSettings,
     openSamsungHealth,
     needsHealthConnectScreen,
     healthConnectAvailable: statusChecked ? healthConnectAvailable : null,
-    isCheckingHealthConnect: usesNativeHealth && isAvailable && !statusChecked,
+    isCheckingHealthConnect:
+      !DESIGN_PREVIEW && usesNativeHealth && isAvailable && !statusChecked,
     refreshHealthConnectStatus: checkStatusOnce,
     healthConnectPlayUrl: HEALTH_CONNECT_PLAY_URL,
   };

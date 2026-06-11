@@ -141,11 +141,34 @@ async function sumStepsRecordsBetween(start, end) {
   return records.reduce((sum, r) => sum + stepsFromRecord(r), 0);
 }
 
+function startOfLocalDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+async function aggregateBetween(recordType, start, end, valueKey) {
+  if (!HealthConnect?.aggregateRecord) return null;
+  try {
+    const agg = await HealthConnect.aggregateRecord({
+      recordType,
+      timeRangeFilter: {
+        operator: 'between',
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      },
+    });
+    const n = agg?.[valueKey];
+    if (typeof n === 'number' && Number.isFinite(n)) return Math.max(0, n);
+  } catch (err) {
+    console.warn(`Health Connect aggregateRecord(${recordType}):`, err?.message ?? err);
+  }
+  return null;
+}
+
 export const getTodaySteps = async () => {
   if (!isAvailable()) return 0;
   try {
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const startOfDay = startOfLocalDay(now);
     const aggregated = await aggregateStepsBetween(startOfDay, now);
     if (aggregated != null) return aggregated;
     return await sumStepsRecordsBetween(startOfDay, now);
@@ -153,6 +176,62 @@ export const getTodaySteps = async () => {
     console.error('Health Connect getTodaySteps:', err);
     return 0;
   }
+};
+
+export const getTodayDistance = async () => {
+  if (!isAvailable()) return 0;
+  try {
+    const now = new Date();
+    const start = startOfLocalDay(now);
+    const meters = await aggregateBetween('Distance', start, now, 'DISTANCE_TOTAL');
+    return meters != null ? meters : 0;
+  } catch (err) {
+    console.error('Health Connect getTodayDistance:', err);
+    return 0;
+  }
+};
+
+export const getTodayActiveCalories = async () => {
+  if (!isAvailable()) return 0;
+  try {
+    const now = new Date();
+    const start = startOfLocalDay(now);
+    const kcal = await aggregateBetween('ActiveCaloriesBurned', start, now, 'ACTIVE_CALORIES_TOTAL');
+    return kcal != null ? Math.round(kcal) : 0;
+  } catch (err) {
+    console.error('Health Connect getTodayActiveCalories:', err);
+    return 0;
+  }
+};
+
+export const getDailyMetrics = async () => {
+  if (!isAvailable()) {
+    return { steps: 0, distanceM: 0, activeCalories: 0, activeMinutes: 0 };
+  }
+  const now = new Date();
+  const start = startOfLocalDay(now);
+  const [steps, distanceM, activeCalories] = await Promise.all([
+    getTodaySteps(),
+    getTodayDistance(),
+    getTodayActiveCalories(),
+  ]);
+  const activeMinutes = steps > 0 ? Math.max(1, Math.round(steps / 100)) : 0;
+  return { steps, distanceM, activeCalories, activeMinutes };
+};
+
+export const getStepsHistory = async (days = 7) => {
+  if (!isAvailable()) return [];
+  const result = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const start = startOfLocalDay(day);
+    const end = i === 0 ? now : new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999);
+    const steps = await getStepsInRange(start, end);
+    const dateKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    result.push({ date: dateKey, steps });
+  }
+  return result;
 };
 
 export const getStepsInRange = async (startDate, endDate) => {

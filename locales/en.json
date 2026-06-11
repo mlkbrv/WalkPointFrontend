@@ -12,15 +12,18 @@
     "get": "Get",
     "partner": "Partner",
     "retry": "Try again",
-    "notAvailable": "N/A"
+    "notAvailable": "N/A",
+    "viewAll": "View All",
+    "done": "Done"
   },
   "tabs": {
     "home": "Home",
     "track": "Track",
     "market": "Market",
-    "report": "Report",
-    "scoreboard": "Scoreboard",
-    "account": "Account"
+    "store": "Store",
+    "social": "Social",
+    "profile": "Profile",
+    "report": "Stats"
   },
   "auth": {
     "tagline": "Walk. Earn. Enjoy.",
@@ -90,6 +93,11 @@
     "hcSettings": "Open Health Connect"
   },
   "home": {
+    "goal": "GOAL: {{count}}",
+    "startTracking": "START TRACKING",
+    "trendingRewards": "Trending Rewards",
+    "weeklyMomentum": "Weekly Momentum",
+    "greeting": "Hi, {{name}}",
     "connectHcBanner": "Connect Health Connect to sync steps",
     "connectHealthBanner": "Connect Apple Health for steps and better calorie estimates",
     "connect": "Connect",
@@ -110,6 +118,14 @@
     "goalLabel": "Goal {{goal}}",
     "coinsPreview": "{{coins}} coins · {{left}} to 5k",
     "quickMore": "More features",
+    "sectionProgress": "Your progress",
+    "streakDays": "day streak",
+    "activeChallenge": "Active challenge",
+    "noChallenge": "No active challenge",
+    "achievementsProgress": "{{unlocked}}/{{total}} badges",
+    "viewStats": "Statistics",
+    "quickFriends": "Friends",
+    "quickSocial": "Leaderboard",
     "time": "time",
     "kcal": "kcal",
     "km": "km",
@@ -163,8 +179,15 @@
     "startRoute": "Start route",
     "stopRoute": "Stop route"
   },
+  "social": {
+    "title": "Community",
+    "challengesCta": "Weekly challenges",
+    "challengesSub": "Earn bonus coins",
+    "manageFriends": "Manage friends",
+    "manageTeams": "My teams"
+  },
   "account": {
-    "title": "Account",
+    "title": "Profile",
     "userFallback": "User",
     "coins": "Coins",
     "totalSteps": "Total Steps",
@@ -180,6 +203,10 @@
     "language": "Language",
     "languageEnglish": "English",
     "languageRussian": "Русский",
+    "appearance": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
     "logOut": "Log Out",
     "noStepsTitle": "No steps",
     "noStepsMessage": "Walk some steps before converting.",
@@ -246,9 +273,41 @@
     "redeemed": "Coupon redeemed",
     "scanQr": "Scan QR code"
   },
+  "notifications": {
+    "title": "Notifications",
+    "markAll": "Mark all read",
+    "empty": "No notifications yet",
+    "today": "Today",
+    "earlier": "Earlier"
+  },
+  "coupon": {
+    "secureVerify": "Secure Verification",
+    "verifyToken": "Token: {{token}}",
+    "verifyFailed": "Could not start verification"
+  },
+  "track": {
+    "morningRoute": "Route workout",
+    "summaryTitle": "Workout Summary",
+    "workoutComplete": "Workout complete!",
+    "duration": "Duration",
+    "distance": "Distance",
+    "calories": "Calories",
+    "tokens": "Tokens"
+  },
   "market": {
-    "title": "Coupon Store",
+    "title": "Store",
+    "subtitle": "Spend steps on partner rewards",
+    "yourSteps": "Your Steps",
+    "availableVouchers": "Available Vouchers",
+    "insufficientSteps": "Insufficient steps",
+    "insufficientStepsDetail": "You need {{need}} steps but have {{have}}.",
+    "claimSuccess": "\"{{title}}\" claimed successfully!",
+    "purchaseFailed": "Purchase failed",
+    "boosts": "Boost shop",
+    "premium": "Premium",
+    "shopExtras": "Extras",
     "empty": "No coupons available yet",
+    "emptyHint": "Check back later or try another category.",
     "stepsPrice": "{{steps}} steps",
     "coinsShort": "{{coins}}c",
     "offerFallback": "Offer",
@@ -260,9 +319,13 @@
   },
   "myCoupons": {
     "title": "My Coupons",
+    "loading": "Loading your coupons…",
+    "countSubtitle": "{{count}} active coupons",
+    "active": "Active",
+    "redeemed": "Used",
     "emptyTitle": "No Coupons Yet",
-    "emptySubtitle": "Tap “Buy new coupon” below to get coupons from the store.",
-    "buyNew": "Buy new coupon",
+    "emptySubtitle": "Browse the store and redeem offers with your coins.",
+    "buyNew": "Browse store",
     "validUntil": "Valid until {{date}}"
   },
   "couponDetail": {

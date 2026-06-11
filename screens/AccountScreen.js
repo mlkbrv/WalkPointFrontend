@@ -1,15 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
+import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import {
   ChevronRight,
-  Coins,
   Footprints,
   LogOut,
   MoreVertical,
-  RefreshCw,
   User,
 } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,9 +25,17 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { setAppLanguage } from '../i18n/config';
 import { getEconomyRules } from '../services/apiService';
+import AnimatedPressable from '../components/ui/AnimatedPressable';
+import GradientCard from '../components/ui/GradientCard';
+import PrimaryButton from '../components/ui/PrimaryButton';
+import RewardBurst from '../components/ui/RewardBurst';
+import { useTheme } from '../context/ThemeContext';
 
 export default function AccountScreen() {
   const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const {
     totalStats,
@@ -42,6 +49,7 @@ export default function AccountScreen() {
   } = useApp();
   const { user, logout, refreshProfile } = useAuth();
   const [converting, setConverting] = useState(false);
+  const [showReward, setShowReward] = useState(false);
   const [economy, setEconomy] = useState(null);
 
   const appVersion =
@@ -71,6 +79,9 @@ export default function AccountScreen() {
     try {
       const result = await convertStepsToCoins();
       if (result) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setShowReward(true);
+        setTimeout(() => setShowReward(false), 900);
         Alert.alert(
           t('account.convertedTitle'),
           t('account.convertedMessage', {
@@ -145,23 +156,23 @@ export default function AccountScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Footprints size={24} color="#8140F3" />
+            <Footprints size={24} color={c.primary} />
           </View>
-          <Text style={styles.headerTitle}>{t('tabs.account')}</Text>
+          <Text style={styles.headerTitle}>{t('tabs.profile')}</Text>
           <Pressable style={styles.menuButton} onPress={handleHeaderMenu} hitSlop={12}>
-            <MoreVertical size={20} color="#000000" />
+            <MoreVertical size={20} color={c.textPrimary} />
           </Pressable>
         </View>
 
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            <User size={48} color="#8140F3" strokeWidth={2} />
+            <User size={48} color={c.primary} strokeWidth={2} />
           </View>
           <Text style={styles.userName}>{displayName}</Text>
           <Text style={styles.userEmail}>{displayEmail}</Text>
@@ -172,22 +183,18 @@ export default function AccountScreen() {
           ) : null}
         </View>
 
-        {/* Wallet + Steps Summary */}
-        <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <Coins size={24} color="#8140F3" />
-            <Text style={styles.statValue}>{Math.round(coinsDisplay).toLocaleString()}</Text>
-            <Text style={styles.statLabel}>{t('account.coins')}</Text>
+        <GradientCard style={styles.walletHero} contentStyle={styles.walletHeroInner}>
+          <Text style={styles.walletLabel}>{t('account.coins')}</Text>
+          <Text style={styles.walletBalance}>{Math.round(coinsDisplay).toLocaleString()}</Text>
+          <View style={styles.walletMeta}>
+            <Text style={styles.walletMetaText}>
+              {(totalStats?.steps ?? 0).toLocaleString()} {t('account.totalSteps')}
+            </Text>
+            <Text style={styles.walletMetaText}>
+              {Math.floor(totalTimeMinutes / 60)}h {t('account.totalTime')}
+            </Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{(totalStats?.steps ?? 0).toLocaleString()}</Text>
-            <Text style={styles.statLabel}>{t('account.totalSteps')}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{Math.floor(totalTimeMinutes / 60)}h</Text>
-            <Text style={styles.statLabel}>{t('account.totalTime')}</Text>
-          </View>
-        </View>
+        </GradientCard>
 
         {economy ? (
           <Text style={styles.economyHint}>
@@ -199,50 +206,35 @@ export default function AccountScreen() {
           </Text>
         ) : null}
 
-        {/* Convert Steps Button */}
-        <Pressable
-          style={[styles.convertButton, (converting || isSyncing) && styles.convertButtonDisabled]}
-          onPress={handleConvert}
-          disabled={converting || isSyncing}
-        >
-          {converting || isSyncing ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <RefreshCw size={20} color="#FFFFFF" />
-              <Text style={styles.convertButtonText}>
-                {t('account.convertSteps', { count: dailyStats?.steps ?? 0 })}
-              </Text>
-            </>
-          )}
-        </Pressable>
+        <View style={styles.convertWrap}>
+          <RewardBurst visible={showReward} />
+          <PrimaryButton
+            variant="gradient"
+            label={t('account.convertSteps', { count: dailyStats?.steps ?? 0 })}
+            loading={converting || isSyncing}
+            onPress={handleConvert}
+          />
+        </View>
 
         {/* Menu Items */}
         <View style={styles.menuSection}>
-          <Pressable
-            style={[styles.menuItem, styles.menuItemFeatured]}
-            onPress={() => navigation.navigate('Features')}
-          >
-            <Text style={styles.menuItemFeaturedText}>{t('account.features')}</Text>
-            <ChevronRight size={20} color="#8140F3" strokeWidth={2} />
-          </Pressable>
           <Pressable
             style={styles.menuItem}
             onPress={() => navigation.navigate('HowToConnectSteps')}
           >
             <Text style={styles.menuItemText}>{t('account.howToSteps')}</Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           <Pressable style={styles.menuItem} onPress={() => openBodyProfileEditor?.()}>
             <Text style={styles.menuItemText}>{t('account.bodyProfile')}</Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           <Pressable
             style={styles.menuItem}
             onPress={() => navigation.navigate('Transactions')}
           >
             <Text style={styles.menuItemText}>{t('account.transactions')}</Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           {user?.role === 'PARTNER' ? (
             <Pressable
@@ -250,14 +242,14 @@ export default function AccountScreen() {
               onPress={() => navigation.navigate('PartnerHub')}
             >
               <Text style={styles.menuItemText}>{t('account.partnerHub')}</Text>
-              <ChevronRight size={20} color="#999999" strokeWidth={2} />
+              <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
             </Pressable>
           ) : null}
           <Pressable style={styles.menuItem} onPress={handleLanguage}>
             <Text style={styles.menuItemText}>
               {t('account.language')} ({i18n.language === 'ru' ? 'RU' : 'EN'})
             </Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           <Pressable
             style={styles.menuItem}
@@ -265,7 +257,7 @@ export default function AccountScreen() {
             android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
           >
             <Text style={styles.menuItemText}>{t('account.settings')}</Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           <Pressable
             style={styles.menuItem}
@@ -273,7 +265,7 @@ export default function AccountScreen() {
             android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
           >
             <Text style={styles.menuItemText}>{t('account.notifications')}</Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           <Pressable
             style={styles.menuItem}
@@ -281,7 +273,7 @@ export default function AccountScreen() {
             android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
           >
             <Text style={styles.menuItemText}>{t('account.privacy')}</Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           <Pressable
             style={styles.menuItem}
@@ -289,14 +281,14 @@ export default function AccountScreen() {
             android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
           >
             <Text style={styles.menuItemText}>{t('account.about')}</Text>
-            <ChevronRight size={20} color="#999999" strokeWidth={2} />
+            <ChevronRight size={20} color={c.textMuted} strokeWidth={2} />
           </Pressable>
           <Pressable style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout}>
             <View style={styles.logoutRow}>
-              <LogOut size={20} color="#F44336" />
+              <LogOut size={20} color={c.danger} />
               <Text style={styles.logoutText}>{t('account.logOut')}</Text>
             </View>
-            <ChevronRight size={20} color="#F44336" strokeWidth={2} />
+            <ChevronRight size={20} color={c.danger} strokeWidth={2} />
           </Pressable>
         </View>
       </ScrollView>
@@ -304,10 +296,12 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: c.screenBg,
   },
   scrollView: {
     flex: 1,
@@ -329,7 +323,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000000',
+    color: c.textPrimary,
     flex: 1,
     textAlign: 'center',
   },
@@ -342,7 +336,7 @@ const styles = StyleSheet.create({
   profileSection: {
     alignItems: 'center',
     paddingVertical: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.card,
     marginHorizontal: 20,
     borderRadius: 24,
     marginBottom: 20,
@@ -356,58 +350,58 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#F3E5F5',
+    backgroundColor: c.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 3,
-    borderColor: '#8140F3',
+    borderColor: c.primary,
   },
   userName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000000',
+    color: c.textPrimary,
     marginBottom: 6,
   },
   userEmail: {
     fontSize: 14,
-    color: '#666666',
+    color: c.textSecondary,
     fontWeight: '500',
   },
   referralCode: {
     fontSize: 13,
-    color: '#8140F3',
+    color: c.primary,
     fontWeight: '600',
     marginTop: 8,
   },
-  statsSection: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
+  walletHero: {
+    marginHorizontal: 20,
     marginBottom: 20,
-    gap: 10,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
+  walletHeroInner: {
+    paddingVertical: 24,
+    paddingHorizontal: 20,
   },
-  statValue: {
-    fontSize: 24,
+  walletLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  walletBalance: {
+    fontSize: 40,
     fontWeight: '800',
-    color: '#8140F3',
-    marginBottom: 4,
-    marginTop: 4,
+    color: c.onPrimary,
+    letterSpacing: -1,
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#666666',
+  walletMeta: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 12,
+  },
+  walletMetaText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
     fontWeight: '500',
   },
   economyHint: {
@@ -415,36 +409,42 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 13,
     lineHeight: 18,
-    color: '#6B7280',
+    color: c.textSecondary,
     textAlign: 'center',
+  },
+  convertWrap: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    position: 'relative',
+  },
+  convertPressable: {
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   convertButton: {
     flexDirection: 'row',
-    backgroundColor: '#8140F3',
-    marginHorizontal: 20,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    marginBottom: 20,
-    shadowColor: '#8140F3',
+    shadowColor: c.accent,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     elevation: 6,
   },
   convertButtonDisabled: {
     opacity: 0.6,
   },
   convertButtonText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
   menuSection: {
     paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.card,
     marginHorizontal: 20,
     borderRadius: 24,
     marginBottom: 40,
@@ -462,20 +462,20 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
+    borderBottomColor: c.cardBorder,
   },
   menuItemText: {
     fontSize: 16,
-    color: '#000000',
+    color: c.textPrimary,
     fontWeight: '600',
   },
   menuItemFeatured: {
-    backgroundColor: '#F3E8FF',
-    borderBottomColor: '#E9D5FF',
+    backgroundColor: c.primarySoft,
+    borderBottomColor: c.primarySoft,
   },
   menuItemFeaturedText: {
     fontSize: 16,
-    color: '#6B2FD9',
+    color: c.primaryDark,
     fontWeight: '700',
   },
   logoutItem: {
@@ -488,7 +488,8 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 16,
-    color: '#F44336',
+    color: c.danger,
     fontWeight: '600',
   },
-});
+  });
+}

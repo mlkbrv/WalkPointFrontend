@@ -25,6 +25,7 @@ import {
   getDateKey,
 } from '../utils/calculations';
 import { tierCoinsForSteps } from '../utils/tierCoins';
+import { useTheme } from '../context/ThemeContext';
 
 const METRIC_KEYS = ['Steps', 'Time', 'Calorie', 'Distance'];
 
@@ -52,6 +53,9 @@ function formatTickValue(val, metric) {
 
 function ReportScreen() {
   const { t, i18n } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { totalStats, bodyProfile, getHistoricalStats, syncActivityHistory, refreshWallet } = useApp();
   const { user } = useAuth();
   const navigation = useNavigation();
@@ -342,18 +346,18 @@ function ReportScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Footprints size={24} color="#8140F3" />
+            <Footprints size={24} color={c.primary} />
           </View>
           <Text style={styles.headerTitle}>{t('tabs.report')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.totalStepsContainer}>
-          <Footprints size={48} color="#8140F3" strokeWidth={2} />
+          <Footprints size={48} color={c.primary} strokeWidth={2} />
           <Text style={styles.totalStepsValue}>{totalStats.steps.toLocaleString()}</Text>
           <Text style={styles.totalStepsLabel}>{t('report.totalStepsCaption')}</Text>
         </View>
@@ -388,7 +392,7 @@ function ReportScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('report.prevWeek')}
               >
-                <ChevronLeft size={22} color="#8140F3" />
+                <ChevronLeft size={22} color={c.primary} />
               </Pressable>
               <Text style={styles.weekRangeText} numberOfLines={1}>
                 {weekRangeLabel}
@@ -400,13 +404,13 @@ function ReportScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('report.nextWeek')}
               >
-                <ChevronRight size={22} color={canGoNextWeek ? '#8140F3' : '#CCCCCC'} />
+                <ChevronRight size={22} color={canGoNextWeek ? c.primary : c.cardBorder} />
               </Pressable>
             </View>
           </View>
 
           {weekLoading ? (
-            <ActivityIndicator color="#8140F3" style={{ marginVertical: 24 }} />
+            <ActivityIndicator color={c.primary} style={{ marginVertical: 24 }} />
           ) : (
             <View style={styles.chartWrapper}>
               <View style={styles.yAxis}>
@@ -442,7 +446,7 @@ function ReportScreen() {
                               styles.bar,
                               {
                                 height: Math.max(height, 5),
-                                backgroundColor: isTodayBar ? '#8140F3' : '#E1BEE7',
+                                backgroundColor: isTodayBar ? c.primary : c.primarySoft,
                               },
                             ]}
                           />
@@ -489,7 +493,7 @@ function ReportScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('report.prevMonth')}
               >
-                <ChevronLeft size={22} color="#8140F3" />
+                <ChevronLeft size={22} color={c.primary} />
               </Pressable>
               <Text style={styles.monthTitleText} numberOfLines={1}>
                 {monthTitle}
@@ -501,13 +505,13 @@ function ReportScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('report.nextMonth')}
               >
-                <ChevronRight size={22} color={canGoNextMonth ? '#8140F3' : '#CCCCCC'} />
+                <ChevronRight size={22} color={canGoNextMonth ? c.primary : c.cardBorder} />
               </Pressable>
             </View>
           </View>
 
           {monthLoading ? (
-            <ActivityIndicator color="#8140F3" style={{ marginVertical: 16 }} />
+            <ActivityIndicator color={c.primary} style={{ marginVertical: 16 }} />
           ) : (
             <View style={styles.calendarGrid}>
               {(Array.isArray(calendarWeekdays) ? calendarWeekdays : []).map((day) => (
@@ -541,7 +545,7 @@ function ReportScreen() {
                             cx={16}
                             cy={16}
                             r={radius}
-                            stroke="#8140F3"
+                            stroke={c.primary}
                             strokeWidth={2}
                             fill="none"
                             strokeDasharray={circumference}
@@ -586,7 +590,7 @@ function ReportScreen() {
             </Text>
             <View style={styles.sheetStats}>
               <View style={styles.sheetStatBox}>
-                <Footprints size={20} color="#8140F3" />
+                <Footprints size={20} color={c.primary} />
                 <Text style={styles.sheetStatValue}>
                   {Math.floor(sheetStats?.steps ?? 0).toLocaleString()}
                 </Text>
@@ -619,10 +623,12 @@ function ReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme) {
+  const c = theme.colors;
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: c.screenBg,
   },
   scrollView: {
     flex: 1,
@@ -794,7 +800,7 @@ const styles = StyleSheet.create({
   barValueSmall: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#8140F3',
+    color: c.primary,
     marginBottom: 4,
   },
   bar: {
@@ -823,7 +829,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   metricButtonActive: {
-    backgroundColor: '#8140F3',
+    backgroundColor: c.primary,
   },
   metricButtonText: {
     fontSize: 12,
@@ -894,7 +900,7 @@ const styles = StyleSheet.create({
   },
   calendarDayText: {
     fontSize: 12,
-    color: '#8140F3',
+    color: c.primary,
     fontWeight: '700',
   },
   calendarDayTextEmpty: {
@@ -902,14 +908,14 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   allHistoryButton: {
-    backgroundColor: '#8140F3',
+    backgroundColor: c.primary,
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 24,
     alignItems: 'center',
     alignSelf: 'center',
     marginTop: 10,
-    shadowColor: '#8140F3',
+    shadowColor: c.shadowPrimary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
@@ -955,7 +961,7 @@ const styles = StyleSheet.create({
   },
   sheetStatBox: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: c.screenBg,
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
@@ -981,7 +987,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sheetClaimBtn: {
-    backgroundColor: '#8140F3',
+    backgroundColor: c.primary,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
@@ -991,10 +997,11 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   sheetClaimText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
-});
+  });
+}
 
 export default React.memo(ReportScreen);

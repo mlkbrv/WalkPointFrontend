@@ -1,16 +1,19 @@
 import { StatusBar } from 'expo-status-bar';
 import { Zap } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import PrimaryButton from '../components/ui/PrimaryButton';
 import ScreenHeader from '../components/ui/ScreenHeader';
-import { colors, radii, shadow, spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { buyBoost, getBoosts } from '../services/apiService';
 
 export default function BoostShopScreen() {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,10 +31,10 @@ export default function BoostShopScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScreenHeader title={t('features.boosts')} onBack={() => navigation.goBack()} />
       {loading ? (
-        <ActivityIndicator style={styles.loader} color={colors.primary} />
+        <ActivityIndicator style={styles.loader} color={c.primary} />
       ) : (
         <FlatList
           data={rows}
@@ -41,7 +44,7 @@ export default function BoostShopScreen() {
             <View style={styles.card}>
               <View style={styles.cardTop}>
                 <View style={styles.iconWrap}>
-                  <Zap size={24} color={colors.primary} />
+                  <Zap size={24} color={c.primary} />
                 </View>
                 <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>{item.title}</Text>
@@ -79,38 +82,42 @@ export default function BoostShopScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  loader: { marginTop: 48 },
-  list: { padding: spacing.md, paddingBottom: spacing.xl },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.card,
-  },
-  cardTop: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
-  iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.md,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardText: { flex: 1 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  desc: { color: colors.textSecondary, marginTop: 4, fontSize: 14, lineHeight: 20 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, gap: spacing.sm },
-  pill: {
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-  },
-  pillText: { fontWeight: '800', color: colors.primary, fontSize: 13 },
-  price: { fontWeight: '700', color: colors.text, fontSize: 15 },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { radii, shadow, spacing } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.screenBg },
+    loader: { marginTop: 48 },
+    list: { padding: spacing.md, paddingBottom: spacing.xl },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: radii.lg,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      ...shadow.card,
+    },
+    cardTop: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
+    iconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: radii.md,
+      backgroundColor: c.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardText: { flex: 1 },
+    cardTitle: { fontSize: 17, fontWeight: '700', color: c.textPrimary },
+    desc: { color: c.textSecondary, marginTop: 4, fontSize: 14, lineHeight: 20 },
+    metaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, gap: spacing.sm },
+    pill: {
+      backgroundColor: c.primarySoft,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: radii.pill,
+    },
+    pillText: { fontWeight: '800', color: c.primary, fontSize: 13 },
+    price: { fontWeight: '700', color: c.textPrimary, fontSize: 15 },
+  });
+}

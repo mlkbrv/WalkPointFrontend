@@ -18,9 +18,10 @@
     "home": "Главная",
     "track": "Маршрут",
     "market": "Магазин",
-    "report": "Отчёт",
-    "scoreboard": "Рейтинг",
-    "account": "Профиль"
+    "store": "Магазин",
+    "social": "Сообщество",
+    "profile": "Профиль",
+    "report": "Статистика"
   },
   "auth": {
     "tagline": "Ходи. Зарабатывай. Наслаждайся.",
@@ -90,6 +91,11 @@
     "hcSettings": "Настройки Health Connect"
   },
   "home": {
+    "goal": "ЦЕЛЬ: {{count}}",
+    "startTracking": "НАЧАТЬ ТРЕКИНГ",
+    "trendingRewards": "Популярные награды",
+    "weeklyMomentum": "Недельный прогресс",
+    "greeting": "Привет, {{name}}",
     "connectHcBanner": "Подключите Health Connect для синхронизации шагов",
     "connectHealthBanner": "Подключите Apple Health для шагов и точного расчёта калорий",
     "connect": "Подключить",
@@ -110,6 +116,14 @@
     "goalLabel": "Цель {{goal}}",
     "coinsPreview": "{{coins}} монет · до 5k: {{left}}",
     "quickMore": "Ещё функции",
+    "sectionProgress": "Ваш прогресс",
+    "streakDays": "дней подряд",
+    "activeChallenge": "Активный челлендж",
+    "noChallenge": "Нет активного челленджа",
+    "achievementsProgress": "{{unlocked}}/{{total}} наград",
+    "viewStats": "Статистика",
+    "quickFriends": "Друзья",
+    "quickSocial": "Рейтинг",
     "time": "время",
     "kcal": "ккал",
     "km": "км",
@@ -155,6 +169,13 @@
       "Готово. Шаги и параметры тела подтянутся из Apple Health."
     ]
   },
+  "social": {
+    "title": "Сообщество",
+    "challengesCta": "Челленджи недели",
+    "challengesSub": "Бонусные монеты",
+    "manageFriends": "Управление друзьями",
+    "manageTeams": "Мои команды"
+  },
   "track": {
     "locationDeniedTitle": "Нет разрешения",
     "locationDeniedMessage": "Для трека маршрута нужен доступ к геолокации.",
@@ -180,6 +201,10 @@
     "language": "Язык",
     "languageEnglish": "English",
     "languageRussian": "Русский",
+    "appearance": "Оформление",
+    "themeLight": "Светлая",
+    "themeDark": "Тёмная",
+    "themeSystem": "Как в системе",
     "logOut": "Выйти",
     "noStepsTitle": "Нет шагов",
     "noStepsMessage": "Сначала пройдите шаги, затем обменивайте их на монеты.",
@@ -248,7 +273,12 @@
   },
   "market": {
     "title": "Магазин купонов",
+    "subtitle": "Трать монеты на награды партнёров",
+    "boosts": "Бусты",
+    "premium": "Премиум",
+    "shopExtras": "Дополнительно",
     "empty": "Пока нет доступных купонов",
+    "emptyHint": "Загляните позже или выберите другую категорию.",
     "stepsPrice": "{{steps}} шагов",
     "coinsShort": "{{coins}} мон",
     "offerFallback": "Предложение",
@@ -260,9 +290,13 @@
   },
   "myCoupons": {
     "title": "Мои купоны",
+    "loading": "Загрузка купонов…",
+    "countSubtitle": "Купонов: {{count}}",
+    "active": "Активен",
+    "redeemed": "Использован",
     "emptyTitle": "Пока нет купонов",
-    "emptySubtitle": "Нажмите «Купить новый купон» ниже, чтобы выбрать предложение в магазине.",
-    "buyNew": "Купить новый купон",
+    "emptySubtitle": "Откройте магазин и обменяйте монеты на предложения.",
+    "buyNew": "В магазин",
     "validUntil": "Действует до {{date}}"
   },
   "couponDetail": {

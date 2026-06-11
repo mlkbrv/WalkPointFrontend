@@ -16,9 +16,26 @@ if (Platform.OS === 'ios') {
 function readPermissionsList() {
   const P = Permissions;
   if (!P) {
-    return ['StepCount', 'Height', 'Weight'];
+    return ['StepCount', 'DistanceWalkingRunning', 'ActiveEnergyBurned', 'Height', 'Weight'];
   }
-  return [P.StepCount, P.Height, P.Weight].filter(Boolean);
+  return [P.StepCount, P.DistanceWalkingRunning, P.ActiveEnergyBurned, P.Height, P.Weight].filter(Boolean);
+}
+
+function startOfLocalDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+function promisifyHealthKit(method, options) {
+  return new Promise((resolve) => {
+    method(options, (err, result) => {
+      if (err) {
+        resolve(0);
+        return;
+      }
+      const value = result?.value ?? result ?? 0;
+      resolve(typeof value === 'number' ? value : 0);
+    });
+  });
 }
 
 export const isAvailable = () => Platform.OS === 'ios' && HealthKit != null;
@@ -61,21 +78,63 @@ export const getGrantedPermissions = async () => [];
 export const getTodaySteps = async () => {
   if (!isAvailable()) return 0;
   const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return new Promise((resolve) => {
-    HealthKit.getStepCount(
-      { startDate: startOfDay.toISOString(), endDate: now.toISOString() },
-      (err, result) => {
-        if (err) {
-          console.error('Apple Health getStepCount:', err);
-          resolve(0);
-          return;
-        }
-        const value = result?.value ?? result ?? 0;
-        resolve(typeof value === 'number' ? value : 0);
-      },
-    );
+  const startOfDay = startOfLocalDay(now);
+  return promisifyHealthKit(HealthKit.getStepCount.bind(HealthKit), {
+    startDate: startOfDay.toISOString(),
+    endDate: now.toISOString(),
   });
+};
+
+export const getTodayDistance = async () => {
+  if (!isAvailable() || !HealthKit.getDistanceWalkingRunning) return 0;
+  const now = new Date();
+  const start = startOfLocalDay(now);
+  const meters = await promisifyHealthKit(HealthKit.getDistanceWalkingRunning.bind(HealthKit), {
+    startDate: start.toISOString(),
+    endDate: now.toISOString(),
+    unit: 'meter',
+  });
+  return meters;
+};
+
+export const getTodayActiveCalories = async () => {
+  if (!isAvailable() || !HealthKit.getActiveEnergyBurned) return 0;
+  const now = new Date();
+  const start = startOfLocalDay(now);
+  const kcal = await promisifyHealthKit(HealthKit.getActiveEnergyBurned.bind(HealthKit), {
+    startDate: start.toISOString(),
+    endDate: now.toISOString(),
+    unit: 'kilocalorie',
+  });
+  return Math.round(kcal);
+};
+
+export const getDailyMetrics = async () => {
+  if (!isAvailable()) {
+    return { steps: 0, distanceM: 0, activeCalories: 0, activeMinutes: 0 };
+  }
+  const [steps, distanceM, activeCalories] = await Promise.all([
+    getTodaySteps(),
+    getTodayDistance(),
+    getTodayActiveCalories(),
+  ]);
+  const activeMinutes = steps > 0 ? Math.max(1, Math.round(steps / 100)) : 0;
+  return { steps, distanceM, activeCalories, activeMinutes };
+};
+
+export const getStepsHistory = async (days = 7) => {
+  if (!isAvailable()) return [];
+  const result = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const start = startOfLocalDay(day);
+    const end = i === 0 ? now : new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999);
+    const steps = await getStepsInRange(start, end);
+    const dateKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    result.push({ date: dateKey, steps });
+  }
+  return result;
 };
 
 export const getStepsInRange = async (startDate, endDate) => {

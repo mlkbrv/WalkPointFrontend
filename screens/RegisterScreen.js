@@ -1,6 +1,7 @@
 import * as Linking from 'expo-linking';
+import { StatusBar } from 'expo-status-bar';
 import { Footprints } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,9 +15,13 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function RegisterScreen({ navigation, route }) {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { register } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -74,10 +79,11 @@ export default function RegisterScreen({ navigation, route }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
         <View style={styles.logoSection}>
           <View style={styles.logoCircle}>
-            <Footprints size={40} color="#FFFFFF" />
+            <Footprints size={40} color={c.onPrimary} />
           </View>
           <Text style={styles.appName}>{t('auth.createAccount')}</Text>
         </View>
@@ -88,21 +94,21 @@ export default function RegisterScreen({ navigation, route }) {
           <TextInput
             style={styles.input}
             placeholder={t('auth.firstNameRequired')}
-            placeholderTextColor="#999"
+            placeholderTextColor={c.textMuted}
             value={firstName}
             onChangeText={setFirstName}
           />
           <TextInput
             style={styles.input}
             placeholder={t('auth.lastName')}
-            placeholderTextColor="#999"
+            placeholderTextColor={c.textMuted}
             value={lastName}
             onChangeText={setLastName}
           />
           <TextInput
             style={styles.input}
             placeholder={t('auth.emailRequired')}
-            placeholderTextColor="#999"
+            placeholderTextColor={c.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
@@ -111,7 +117,7 @@ export default function RegisterScreen({ navigation, route }) {
           <TextInput
             style={styles.input}
             placeholder={t('auth.passwordHint')}
-            placeholderTextColor="#999"
+            placeholderTextColor={c.textMuted}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -119,7 +125,7 @@ export default function RegisterScreen({ navigation, route }) {
           <TextInput
             style={styles.input}
             placeholder={t('auth.referralCode')}
-            placeholderTextColor="#999"
+            placeholderTextColor={c.textMuted}
             autoCapitalize="characters"
             value={referralCode}
             onChangeText={setReferralCode}
@@ -131,7 +137,7 @@ export default function RegisterScreen({ navigation, route }) {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={c.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>{t('auth.signUp')}</Text>
             )}
@@ -149,77 +155,81 @@ export default function RegisterScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FB',
-  },
-  inner: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 48,
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#8140F3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#000',
-  },
-  form: {
-    gap: 14,
-  },
-  errorText: {
-    color: '#F44336',
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#000',
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-  button: {
-    backgroundColor: '#8140F3',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  linkText: {
-    textAlign: 'center',
-    color: '#666',
-    fontSize: 14,
-    marginTop: 8,
-  },
-  linkBold: {
-    color: '#8140F3',
-    fontWeight: '700',
-  },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { radii } = theme;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.screenBg,
+    },
+    inner: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+      paddingVertical: 48,
+    },
+    logoSection: {
+      alignItems: 'center',
+      marginBottom: 40,
+    },
+    logoCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: c.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    appName: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: c.textPrimary,
+    },
+    form: {
+      gap: 14,
+    },
+    errorText: {
+      color: c.danger,
+      textAlign: 'center',
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    input: {
+      backgroundColor: c.card,
+      borderRadius: radii.lg,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      fontSize: 16,
+      color: c.textPrimary,
+      borderWidth: 1,
+      borderColor: c.inputBorder,
+    },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: radii.lg,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    buttonText: {
+      color: c.onPrimary,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    linkText: {
+      textAlign: 'center',
+      color: c.textSecondary,
+      fontSize: 14,
+      marginTop: 8,
+    },
+    linkBold: {
+      color: c.primary,
+      fontWeight: '700',
+    },
+  });
+}

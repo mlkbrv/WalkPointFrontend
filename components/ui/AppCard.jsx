@@ -1,10 +1,25 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors, radii, shadow, spacing } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function AppCard({ children, style, accent }) {
+  const { theme } = useTheme();
+  const { colors, radii, spacing } = theme;
+
   return (
-    <View style={[styles.card, accent && styles.accent, style]}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: accent ? colors.primarySoft : colors.card,
+          borderColor: accent ? colors.primary : colors.cardBorder,
+          borderRadius: radii.lg,
+          padding: spacing.md,
+        },
+        theme.shadow.card,
+        style,
+      ]}
+    >
       {children}
     </View>
   );
@@ -12,15 +27,6 @@ export default function AppCard({ children, style, accent }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.card,
-  },
-  accent: {
-    borderColor: colors.primarySoft,
-    backgroundColor: '#FBF7FF',
   },
 });

@@ -1,15 +1,18 @@
 import { StatusBar } from 'expo-status-bar';
 import { Lock, Medal } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import ScreenHeader from '../components/ui/ScreenHeader';
-import { colors, radii, shadow, spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { getAchievements } from '../services/apiService';
 
 export default function AchievementsScreen() {
   const { t } = useTranslation();
+  const { theme, isDark } = useTheme();
+  const c = theme.colors;
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const navigation = useNavigation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,10 +29,10 @@ export default function AchievementsScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScreenHeader title={t('features.achievements')} onBack={() => navigation.goBack()} />
       {loading ? (
-        <ActivityIndicator style={styles.loader} color={colors.primary} />
+        <ActivityIndicator style={styles.loader} color={c.primary} />
       ) : (
         <FlatList
           data={rows}
@@ -41,9 +44,9 @@ export default function AchievementsScreen() {
             <View style={[styles.tile, !item.unlocked && styles.tileLocked]}>
               <View style={[styles.medal, item.unlocked ? styles.medalOn : styles.medalOff]}>
                 {item.unlocked ? (
-                  <Medal size={28} color={colors.accent} />
+                  <Medal size={28} color={c.accent} />
                 ) : (
-                  <Lock size={24} color={colors.textMuted} />
+                  <Lock size={24} color={c.textMuted} />
                 )}
               </View>
               <Text style={styles.tileTitle} numberOfLines={2}>
@@ -64,42 +67,46 @@ export default function AchievementsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  loader: { marginTop: 48 },
-  list: { padding: spacing.md, paddingBottom: spacing.xl },
-  gridRow: { gap: spacing.sm, marginBottom: spacing.sm },
-  tile: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 160,
-    ...shadow.card,
-  },
-  tileLocked: { opacity: 0.72 },
-  medal: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  medalOn: { backgroundColor: colors.accentSoft },
-  medalOff: { backgroundColor: colors.bg },
-  tileTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
-  tileDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 17 },
-  badge: {
-    marginTop: spacing.sm,
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  badgeOn: { color: colors.success },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: 40 },
-});
+function createStyles(theme) {
+  const c = theme.colors;
+  const { radii, shadow, spacing } = theme;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.screenBg },
+    loader: { marginTop: 48 },
+    list: { padding: spacing.md, paddingBottom: spacing.xl },
+    gridRow: { gap: spacing.sm, marginBottom: spacing.sm },
+    tile: {
+      flex: 1,
+      backgroundColor: c.card,
+      borderRadius: radii.lg,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      minHeight: 160,
+      ...shadow.card,
+    },
+    tileLocked: { opacity: 0.72 },
+    medal: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    medalOn: { backgroundColor: c.accentSoft },
+    medalOff: { backgroundColor: c.screenBg },
+    tileTitle: { fontSize: 15, fontWeight: '700', color: c.textPrimary },
+    tileDesc: { fontSize: 12, color: c.textSecondary, marginTop: 4, lineHeight: 17 },
+    badge: {
+      marginTop: spacing.sm,
+      fontSize: 11,
+      fontWeight: '700',
+      color: c.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    badgeOn: { color: c.success },
+    empty: { textAlign: 'center', color: c.textSecondary, marginTop: 40 },
+  });
+}
